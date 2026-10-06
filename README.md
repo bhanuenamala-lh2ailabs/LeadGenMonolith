@@ -99,3 +99,21 @@ Outputs go to `reports/vertical/<day>/` (`index.html`, `index.txt`, `snapshot.js
 mkdir -p db/_scratch && .venv/bin/python -m pytest -q tests --basetemp=db/_scratch/pytest_x
 rm -rf db/_scratch
 ```
+
+## 7. Setup with Claude Code (paste this as the first message)
+
+Open Claude Code in an empty folder on your machine, then paste the block below. Claude will do the steps in order and stop to ask you wherever it needs something only you can provide.
+
+```text
+Set up LeadGenMonolith on this machine, exactly as the README in the repo describes. Work in order and stop to ask me when you need something only I can provide.
+
+1. Clone https://github.com/bhanuenamala-lh2ailabs/LeadGenMonolith.git into ./LeadGenMonolith and cd into it. Create .venv with Python 3.9+ and install requirements.txt.
+2. Secrets: ask me for the .env values and the Google token files. Do not invent or print any key. Write .env from .env.example with my values, and put the token files in secrets/. Never commit them. Confirm .gitignore still covers .env and secrets/.
+3. Three source repos: ask me for the local paths of companyOps, hubspot and RapidActionTeam (and where each repo's Claude Code chat folder is under ~/.claude/projects/). Copy their data folders as described in README section 3. Do not modify those repos.
+4. Run: .venv/bin/python -m leadgen migrate, then .venv/bin/python -m leadgen status. Confirm the schema is at migration 0021.
+5. Run the legacy imports from README section 3 (tam, repo-dbs). Report row counts.
+6. Run the test suite from README section 7 and report the pass count. It should be 339 passed.
+7. Apollo tracking: run tools/apollo_tracker.py balance and tools/apollo_tracker.py scan. Report what they show. Do not make any Apollo call.
+
+Hard rules (from CONTEXT.md): do not call Apollo, SignalHire or Apify. Do not write to HubSpot except through tools/. Do not set up any scheduler or automatic mail. Never print or log a secret. Stop and ask me before any step that spends credits or sends email.
+```
