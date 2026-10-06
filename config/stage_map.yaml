@@ -1,0 +1,264 @@
+# Native stage -> canonical stage map for the five reporting pipelines.  DATA, not code.  Keyed by (account, pipeline_id, stage_id):
+# a label is never a key (labels collide across pipelines and were renamed; ids are what HubSpot stores in deal history).
+#
+# Built by hand from the LIVE pipeline definitions (GET /crm/v3/pipelines/deals, 2026-10-04, as stored in hsraw_object) and
+#   docs/discovery/funnel-reports.md  section 4.2 "Canonical funnel ladder" + "Canonical dead taxonomy" + 4.5 per-portal rules
+#   docs/discovery/companyops-pipelines-live.json (COMPANYOPS stage definitions)
+#   config/canonical_stages.yaml (the ladder and dead reasons the codes below come from)
+# `leadgen.hubspot.canonicalize` applies it to stage_map / stage_alias and FAILS LOUD (ops_dq_issue 'unmapped_stage', v_unmapped_stage,
+# doctor warning) for any stage of a reporting pipeline that has no row here.  It also warns (info) when a live label no longer matches
+# the `label` recorded here (renamed stage: the mapping by id still holds).
+#
+# Row fields
+#   id / label     HubSpot stage id and the label it had when mapped (documentation + drift check)
+#   canonical      a canonical_stage code (never a derived rung: MEETING_HELD and EVALUATED are computed from events)
+#   kind           live | dead | won - redundant on purpose: checked against the canonical code at load time
+#   dead_reason    canonical_dead_reason code, REQUIRED for DEAD stages
+#   depth_reached  highest canonical depth the deal reached before dying (DEAD only; RETIRED_ADMIN needs none)
+#   sub_row        native detail kept under a shared rung (CoOps ( Global ) Sample Extraction / Demand Fulfillment under NEGOTIATION)
+#   flag_*         per-stage override of the effort flags (CoOps "Dead: Communicated / Wrong Fit" was already communicated: an attempt)
+#
+# DECISIONS the owner may want to flip (each is one line below):
+#   1. "Call Attempted (retired)" (Coding 3992480464 and the old Campaign id) -> DEAD / RETIRED_ADMIN, following funnel-reports 4.5 and
+#      config/canonical_stages.yaml.  funnel-reports 4.2 (ladder) and the SOP ("map historical Call Attempted to No Pickup for continuity")
+#      would put it on NO_ANSWER instead.
+#   2. CoOps ( Global ) "Communicated" -> REPLIED (rank 2), open question 1 in funnel-reports section 7.
+#   3. "Retired: Callback +1 day" (both Clusters) -> NO_ANSWER (live), as the report rows already do.
+#   4. Dead depth_reached: a no-show always implies a booked slot (4); quality deaths after an asset came back count as EVALUATED (8);
+#      "died at <stage>" otherwise.
+#
+# NOT mapped on purpose (reported by canonicalize as unmapped, label unknown anywhere in the repo or the API):
+#   COMPANYOPS / Cluster 2 stage ids 4080987862 and 4111134400 (125 events each, 2026-08-06/07, the retired Gmail cold-email branch:
+#   created in the first, moved to the second, 124 of 125 then parked in "Dead: Email Campaign / Branch Retired"), 4080987867, 4080987868,
+#   4111134403 (3 / 3 / 2 events between "One pager received" and "LOI signed": the v3 sample-evaluation stretch) and 4080987879
+#   (1 event, Replied -> "Dead: Replied / Not Interested").  A human has to name them (funnel B-L4 in docs/review/schema-decisions.md).
+version: 1
+
+# The RAT stock pipeline (HubSpot's "Deals pipeline", 7 stock stages, 1 sample deal) is flagged non-reporting in config/accounts.yaml.
+# Its stages are stored (the sample deal needs the FK) but need no mapping.
+ignored_pipelines:
+  - {account: rat, pipeline_id: "default", reason: "HubSpot stock pipeline holding one sample deal; ignored by every report"}
+
+# Label renames HubSpot history / old docs still use (stage_alias kind 'label', lower-case).
+label_aliases:
+  - {account: companyops, pipeline_id: "default", alias: "callback +1 day", stage_id: "4326787820", reason: "docs call the stage 'Callback +1 day'; live label is 'Retired: Callback +1 day (use No pickup + task instead)'"}
+  - {account: companyops, pipeline_id: "2464812771", alias: "callback +1 day", stage_id: "4307080900", reason: "docs call the stage 'Callback +1 day'; live label is 'Retired: Callback +1 day (use No pickup + task instead)'"}
+  - {account: main, pipeline_id: "default", alias: "call attempted", stage_id: "3992480464", reason: "'Call Attempted' was retired 2026-08-05 (label now 'Call Attempted (retired)')"}
+
+
+pipelines:
+  - account: main
+    pipeline_id: "default"
+    label: "Coding"
+    stages:
+      - {id: "3992480462", label: "Cold Call", canonical: "SOURCED", kind: "live"}
+      - {id: "4104051404", label: "No Pickup", canonical: "NO_ANSWER", kind: "live"}
+      - {id: "3992480465", label: "Interested", canonical: "INTERESTED", kind: "live"}
+      - {id: "3992480469", label: "GMeet Fixed", canonical: "MEETING_BOOKED", kind: "live"}
+      - {id: "3992480471", label: "Script Shared", canonical: "ASSET_REQUESTED", kind: "live"}
+      - {id: "3992480473", label: "Script Results Received", canonical: "ASSET_RECEIVED", kind: "live"}
+      - {id: "4030231231", label: "Commercial Negotiation", canonical: "NEGOTIATION", kind: "live"}
+      - {id: "4173850324", label: "LOI", canonical: "NEGOTIATION", kind: "live"}
+      - {id: "4029653710", label: "Deal Contract Signed", canonical: "CONTRACT", kind: "live"}
+      - {id: "3992480475", label: "Data Migration Done", canonical: "DELIVERED", kind: "live"}
+      - {id: "4036632313", label: "Metadata Matched", canonical: "DELIVERED", kind: "live"}
+      - {id: "4036633274", label: "Payment Initiation", canonical: "PAYMENT", kind: "live"}
+      - {id: "4036632309", label: "Closed/Won", canonical: "WON", kind: "won"}
+      - {id: "4036632310", label: "Dead/ColdCall/Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2}
+      - {id: "4036687547", label: "Dead/ColdCall/WrongFit", canonical: "DEAD", kind: "dead", dead_reason: "WRONG_FIT", depth_reached: 0}
+      - {id: "4099250912", label: "Dead/ColdCall/WrongNumber", canonical: "DEAD", kind: "dead", dead_reason: "BAD_CONTACT", depth_reached: 1}
+      - {id: "4102985416", label: "Dead/ColdCall/NoPickup", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 1}
+      - {id: "4061963984", label: "Dead/Interested/NoShow", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 4, note: "died at Interested but a no-show implies a booked slot: depth 4"}
+      - {id: "4102985417", label: "Dead/GMeet/NoShow", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 4}
+      - {id: "4103772884", label: "Dead/GMeet/Cancelled", canonical: "DEAD", kind: "dead", dead_reason: "MEETING_CANCELLED", depth_reached: 4}
+      - {id: "4036632311", label: "Dead/GMeet/wrong fit", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 5}
+      - {id: "4036687548", label: "Dead/GMeet/Privacy Concerns", canonical: "DEAD", kind: "dead", dead_reason: "PRIVACY", depth_reached: 5}
+      - {id: "4104051405", label: "Dead/ScriptShared/NoShow", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 6}
+      - {id: "4036687549", label: "Dead/ResultsReceived/WrongFit-Rejected", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 8, note: "post-evaluation quality fail: the derived EVALUATED rung (8) was reached"}
+      - {id: "4035313388", label: "Dead/Negotiation/Pricing", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+      - {id: "4036632312", label: "Dead/Negotiation/Contractual", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+      - {id: "4326788842", label: "Dropped - Pretraining", canonical: "DEAD", kind: "dead", dead_reason: "RETIRED_ADMIN", note: "not a funnel outcome (funnel-reports 4.5): Retired"}
+      - {id: "3992480464", label: "Call Attempted (retired)", canonical: "DEAD", kind: "dead", dead_reason: "RETIRED_ADMIN", note: "retired 2026-08-05, replaced by No Pickup; funnel-reports 4.5/4.2 map it to Retired (its older KPI alias to No Pickup is NOT applied here)"}
+  - account: main
+    pipeline_id: "2425754306"
+    label: "CoOps ( Global )"
+    stages:
+      - {id: "4317507288", label: "Cold Lead", canonical: "SOURCED", kind: "live"}
+      - {id: "4317507289", label: "Communicated", canonical: "REPLIED", kind: "live", note: "open question 1 in funnel-reports section 7: Communicated = replied (rank 2) until the owner says otherwise"}
+      - {id: "4317507290", label: "No Response", canonical: "NO_ANSWER", kind: "live"}
+      - {id: "4018854633", label: "Interested", canonical: "INTERESTED", kind: "live"}
+      - {id: "4317507291", label: "VC Fixed", canonical: "MEETING_BOOKED", kind: "live"}
+      - {id: "4317507292", label: "VC Rescheduled", canonical: "MEETING_BOOKED", kind: "live"}
+      - {id: "4317507293", label: "1 Pager Shared", canonical: "ASSET_REQUESTED", kind: "live"}
+      - {id: "4317507294", label: "1 Pager Output Received", canonical: "ASSET_RECEIVED", kind: "live"}
+      - {id: "4018854637", label: "Commercial Negotiation", canonical: "NEGOTIATION", kind: "live"}
+      - {id: "4317507295", label: "LOI Signed", canonical: "NEGOTIATION", kind: "live"}
+      - {id: "4317507296", label: "Sample Extraction", canonical: "NEGOTIATION", kind: "live", sub_row: "Sample Extraction"}
+      - {id: "4317507297", label: "Demand Fulfillment", canonical: "NEGOTIATION", kind: "live", sub_row: "Demand Fulfillment"}
+      - {id: "4317507298", label: "Contract Signed", canonical: "CONTRACT", kind: "live"}
+      - {id: "4317507299", label: "Data Extraction Done", canonical: "DELIVERED", kind: "live"}
+      - {id: "4018854642", label: "Closed/Won", canonical: "WON", kind: "won"}
+      - {id: "4317507300", label: "Dead: Communicated / Invalid Contact", canonical: "DEAD", kind: "dead", dead_reason: "BAD_CONTACT", depth_reached: 2}
+      - {id: "4317507301", label: "Dead: Communicated / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2}
+      - {id: "4317507302", label: "Dead: Communicated / Wrong Fit", canonical: "DEAD", kind: "dead", dead_reason: "WRONG_FIT", depth_reached: 2, flag_attempt: 1, note: "already Communicated, so it counts as an attempt (funnel-reports 4.2)"}
+      - {id: "4317507303", label: "Dead: Communicated / No Response", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 2}
+      - {id: "4317507304", label: "Dead: Interested / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 3}
+      - {id: "4317507305", label: "Dead: VC / No Show", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 4}
+      - {id: "4317507306", label: "Dead: VC / Rejected by LH2", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 5}
+      - {id: "4317507307", label: "Dead: VC / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 5}
+      - {id: "4317507308", label: "Dead: 1 Pager / No Response", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 6}
+      - {id: "4317507309", label: "Dead: 1 Pager Output / Low Quality", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 8}
+      - {id: "4317507310", label: "Dead: Negotiation / Pricing Not Agreed", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+      - {id: "4317507311", label: "Dead: Negotiation / Contractual Not Agreed", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+      - {id: "4317507312", label: "Dead: Sample Extraction / Failed", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 9}
+      - {id: "4317507313", label: "Dead: Sample Extraction / Rejected by LH2", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 9}
+      - {id: "4317507314", label: "Dead: Demand Fulfillment / Requirements Not Met", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 9}
+  - account: companyops
+    pipeline_id: "default"
+    label: "Company Ops Cluster 1 India"
+    stages:
+      - {id: "4327110345", label: "LinkedIn sent", canonical: "LI_SENT", kind: "live"}
+      - {id: "4327110346", label: "Cold called assigned", canonical: "SOURCED", kind: "live"}
+      - {id: "4326787818", label: "LinkedIn connected", canonical: "LI_CONNECTED", kind: "live"}
+      - {id: "4326787819", label: "No pickup", canonical: "NO_ANSWER", kind: "live"}
+      - {id: "4326787820", label: "Retired: Callback +1 day (use No pickup + task instead)", canonical: "NO_ANSWER", kind: "live", note: "retired live stage kept because history references it; still counted in the No Pickup / Callback report row"}
+      - {id: "4326787821", label: "Replied", canonical: "REPLIED", kind: "live"}
+      - {id: "4327110347", label: "1st interest sent", canonical: "INTERESTED", kind: "live"}
+      - {id: "4327110348", label: "1st interest follow up", canonical: "INTERESTED", kind: "live"}
+      - {id: "4327110349", label: "Discovery call", canonical: "MEETING_BOOKED", kind: "live"}
+      - {id: "4326787822", label: "Call rescheduled", canonical: "MEETING_BOOKED", kind: "live"}
+      - {id: "4327110350", label: "One pager requested", canonical: "ASSET_REQUESTED", kind: "live"}
+      - {id: "4326787823", label: "One pager follow up", canonical: "ASSET_REQUESTED", kind: "live"}
+      - {id: "4327110351", label: "One pager received", canonical: "ASSET_RECEIVED", kind: "live"}
+      - {id: "4327110352", label: "LOI signed", canonical: "NEGOTIATION", kind: "live"}
+      - {id: "4327110353", label: "Contract signed", canonical: "CONTRACT", kind: "live"}
+      - {id: "4326787824", label: "Ops data handover done", canonical: "DELIVERED", kind: "live"}
+      - {id: "4327110354", label: "Payment initiation", canonical: "PAYMENT", kind: "live"}
+      - {id: "4326787825", label: "Closed/Won", canonical: "WON", kind: "won"}
+      - {id: "4326787826", label: "Dead: Cold Call / Wrong Fit", canonical: "DEAD", kind: "dead", dead_reason: "WRONG_FIT", depth_reached: 0}
+      - {id: "4326787827", label: "Dead: Cold Call / Wrong Number", canonical: "DEAD", kind: "dead", dead_reason: "BAD_CONTACT", depth_reached: 1}
+      - {id: "4326787828", label: "Dead: Cold Call / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2}
+      - {id: "4327110355", label: "Dead: Cold Call / No Pickup", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 1}
+      - {id: "4326787829", label: "Dead: Replied / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2}
+      - {id: "4326787830", label: "Dead: 1st Interest / No Response", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 3}
+      - {id: "4327110356", label: "Dead: 1st Interest / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 3}
+      - {id: "4327110357", label: "Dead: Discovery Call / No Show", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 4}
+      - {id: "4326787831", label: "Dead: Discovery Call / Rejected by LH2", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 5}
+      - {id: "4326787832", label: "Dead: Discovery Call / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 5}
+      - {id: "4326787833", label: "Dead: One Pager / Not Received", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 6}
+      - {id: "4327110358", label: "Dead: One Pager / Low Data Quality", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 8}
+      - {id: "4327110359", label: "Dead: LOI / Pricing Not Agreed", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+      - {id: "4326788794", label: "Dead: LOI / Contractual Not Agreed", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+      - {id: "4326788795", label: "Dead: Email Campaign / Branch Retired", canonical: "DEAD", kind: "dead", dead_reason: "RETIRED_ADMIN", note: "parks the retired Gmail cold-email branch; not a funnel outcome"}
+  - account: companyops
+    pipeline_id: "2464812771"
+    label: "Company Ops Cluster 2 India"
+    stages:
+      - {id: "4307081975", label: "LinkedIn sent", canonical: "LI_SENT", kind: "live"}
+      - {id: "4275264191", label: "Cold called assigned", canonical: "SOURCED", kind: "live"}
+      - {id: "4307081976", label: "LinkedIn connected", canonical: "LI_CONNECTED", kind: "live"}
+      - {id: "4307080899", label: "No pickup", canonical: "NO_ANSWER", kind: "live"}
+      - {id: "4307080900", label: "Retired: Callback +1 day (use No pickup + task instead)", canonical: "NO_ANSWER", kind: "live", note: "retired live stage kept because history references it; still counted in the No Pickup / Callback report row"}
+      - {id: "4080987863", label: "Replied", canonical: "REPLIED", kind: "live"}
+      - {id: "4275264192", label: "1st interest sent", canonical: "INTERESTED", kind: "live"}
+      - {id: "4080987864", label: "1st interest follow up", canonical: "INTERESTED", kind: "live"}
+      - {id: "4111134402", label: "Discovery call", canonical: "MEETING_BOOKED", kind: "live"}
+      - {id: "4275264193", label: "Call rescheduled", canonical: "MEETING_BOOKED", kind: "live"}
+      - {id: "4132224745", label: "One pager requested", canonical: "ASSET_REQUESTED", kind: "live"}
+      - {id: "4132224746", label: "One pager follow up", canonical: "ASSET_REQUESTED", kind: "live"}
+      - {id: "4080987866", label: "One pager received", canonical: "ASSET_RECEIVED", kind: "live"}
+      - {id: "4275264194", label: "LOI signed", canonical: "NEGOTIATION", kind: "live"}
+      - {id: "4080987873", label: "Contract signed", canonical: "CONTRACT", kind: "live"}
+      - {id: "4307080901", label: "Ops data handover done", canonical: "DELIVERED", kind: "live"}
+      - {id: "4307080902", label: "Payment initiation", canonical: "PAYMENT", kind: "live"}
+      - {id: "4307080903", label: "Closed/Won", canonical: "WON", kind: "won"}
+      - {id: "4307080904", label: "Dead: Cold Call / Wrong Fit", canonical: "DEAD", kind: "dead", dead_reason: "WRONG_FIT", depth_reached: 0}
+      - {id: "4307080905", label: "Dead: Cold Call / Wrong Number", canonical: "DEAD", kind: "dead", dead_reason: "BAD_CONTACT", depth_reached: 1}
+      - {id: "4307080906", label: "Dead: Cold Call / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2}
+      - {id: "4307080907", label: "Dead: Cold Call / No Pickup", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 1}
+      - {id: "4080987878", label: "Dead: Replied / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2}
+      - {id: "4275264195", label: "Dead: 1st Interest / No Response", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 3}
+      - {id: "4307080908", label: "Dead: 1st Interest / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 3}
+      - {id: "4080987880", label: "Dead: Discovery Call / No Show", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 4}
+      - {id: "4275264196", label: "Dead: Discovery Call / Rejected by LH2", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 5}
+      - {id: "4275264197", label: "Dead: Discovery Call / Not Interested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 5}
+      - {id: "4132224747", label: "Dead: One Pager / Not Received", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 6}
+      - {id: "4275264198", label: "Dead: One Pager / Low Data Quality", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 8}
+      - {id: "4307080909", label: "Dead: LOI / Pricing Not Agreed", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+      - {id: "4275264199", label: "Dead: LOI / Contractual Not Agreed", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+      - {id: "4275316410", label: "Dead: Email Campaign / Branch Retired", canonical: "DEAD", kind: "dead", dead_reason: "RETIRED_ADMIN", note: "parks the retired Gmail cold-email branch; not a funnel outcome"}
+  - account: rat
+    pipeline_id: "2575252183"
+    label: "Rapid Action Team"
+    stages:
+      - {id: "4332503773", label: "Cold Called Assigned", canonical: "SOURCED", kind: "live"}
+      - {id: "4332503774", label: "No Pickup", canonical: "NO_ANSWER", kind: "live"}
+      - {id: "4332503775", label: "Callback", canonical: "NO_ANSWER", kind: "live"}
+      - {id: "4332503776", label: "Replied", canonical: "REPLIED", kind: "live"}
+      - {id: "4332503777", label: "1st Interest Sent", canonical: "INTERESTED", kind: "live"}
+      - {id: "4332503778", label: "1st Interest Follow Up", canonical: "INTERESTED", kind: "live"}
+      - {id: "4332503779", label: "Discovery Call", canonical: "MEETING_BOOKED", kind: "live"}
+      - {id: "4332503780", label: "Call Rescheduled", canonical: "MEETING_BOOKED", kind: "live", note: "a loop back to Discovery Call, not forward progress"}
+      - {id: "4332503781", label: "Sample Requested", canonical: "ASSET_REQUESTED", kind: "live"}
+      - {id: "4332503782", label: "Sample Follow Up", canonical: "ASSET_REQUESTED", kind: "live"}
+      - {id: "4332503783", label: "Sample Received", canonical: "ASSET_RECEIVED", kind: "live"}
+      - {id: "4332503784", label: "Negotiation", canonical: "NEGOTIATION", kind: "live"}
+      - {id: "4332503785", label: "Contract Signed", canonical: "CONTRACT", kind: "live"}
+      - {id: "4332503786", label: "Ops Data Handover Done", canonical: "DELIVERED", kind: "live"}
+      - {id: "4332503787", label: "Payment Initiation", canonical: "PAYMENT", kind: "live"}
+      - {id: "4332503788", label: "Closed / Won", canonical: "WON", kind: "won", note: "label has spaces in RAT; mapped by id"}
+      - {id: "4332503789", label: "Dead: ColdCall/WrongFit", canonical: "DEAD", kind: "dead", dead_reason: "WRONG_FIT", depth_reached: 0}
+      - {id: "4332503790", label: "Dead: ColdCall/WrongNumber", canonical: "DEAD", kind: "dead", dead_reason: "BAD_CONTACT", depth_reached: 1}
+      - {id: "4332503791", label: "Dead: ColdCall/NotInterested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2}
+      - {id: "4332503792", label: "Dead: ColdCall/NoPickup", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 1}
+      - {id: "4332503793", label: "Dead: Replied/NotInterested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2}
+      - {id: "4332503794", label: "Dead: 1stInterest/NoResponse", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 3}
+      - {id: "4332503795", label: "Dead: 1stInterest/NotInterested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 3}
+      - {id: "4332503796", label: "Dead: DiscoveryCall/RejectedByLH2", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 5}
+      - {id: "4332503797", label: "Dead: DiscoveryCall/NotInterested", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 5}
+      - {id: "4332503798", label: "Dead: DiscoveryCall/NoShow", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 4}
+      - {id: "4332503799", label: "Dead: Sample/NotReceived", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 6}
+      - {id: "4332503800", label: "Dead: Sample/LowDataQuality", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 8}
+      - {id: "4332503801", label: "Dead: Negotiation/PricingNotAgreed", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+      - {id: "4332504762", label: "Dead: Negotiation/ContractualNotAgreed", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9}
+
+# Stage ids that no longer exist in the pipelines API but still appear in deal history (and, for a few archived deals, as the
+# current stage).  They are created as tombstone `stage` rows (is_deleted = 1) before any event refers to them.  An entry with
+# `alias_of` inherits the stage_map row of its live successor (stage_alias); the others carry their own mapping.
+deleted_stages:
+  - {account: "main", pipeline_id: "default", id: "3992480463", label: "Assigned", canonical: "SOURCED", kind: "live", note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label"}
+  - {account: "main", pipeline_id: "default", id: "3992480466", label: "M1V1 Sent", canonical: "NO_ANSWER", kind: "live", note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label (first e-mail version sent = an outreach attempt)"}
+  - {account: "main", pipeline_id: "default", id: "3992480468", label: "Awaiting Meeting", canonical: "MEETING_BOOKED", kind: "live", note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label"}
+  - {account: "main", pipeline_id: "default", id: "3992480470", label: "GMEET1 Completed", canonical: "MEETING_BOOKED", kind: "live", note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label (meeting held is a derived rung and cannot be a mapping target; booked is the nearest stored rung)"}
+  - {account: "main", pipeline_id: "default", id: "3992480472", label: "Awaiting Results", canonical: "ASSET_REQUESTED", kind: "live", note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label"}
+  - {account: "main", pipeline_id: "default", id: "3992480474", label: "Results Under Review", canonical: "ASSET_RECEIVED", kind: "live", note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label"}
+  - {account: "main", pipeline_id: "default", id: "3992480476", label: "Dead - Rejected", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2, note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label"}
+  - {account: "main", pipeline_id: "default", id: "3992480477", label: "Dead - No Response", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 1, note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label"}
+  - {account: "main", pipeline_id: "default", id: "3992480478", label: "Dead - Meeting Rejected", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 3, note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label"}
+  - {account: "main", pipeline_id: "default", id: "3992480479", label: "Dead - Wrong Fit", canonical: "DEAD", kind: "dead", dead_reason: "WRONG_FIT", depth_reached: 0, note: "label recovered from legacy/hubspot/crm_mirror/enrich/export_deals_master.py RETIRED map; mapping inferred from that label"}
+  - {account: "main", pipeline_id: "2425754306", id: "4002503379", label: "Cold Call (old Campaign)", canonical: "SOURCED", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854632", label: "Call Attempted (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "RETIRED_ADMIN", note: "Call Attempted maps to Retired per funnel-reports 4.5 (alternative: NO_ANSWER, see the Coding stage); old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4102985418", label: "No Pickup (old Campaign)", canonical: "NO_ANSWER", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854634", label: "GMeet Fixed (old Campaign)", canonical: "MEETING_BOOKED", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854635", label: "Script Shared (old Campaign)", canonical: "ASSET_REQUESTED", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854636", label: "Script Results Received (old Campaign)", canonical: "ASSET_RECEIVED", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4173777601", label: "LOI (old Campaign)", canonical: "NEGOTIATION", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854638", label: "Deal Contract Signed (old Campaign)", canonical: "CONTRACT", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854639", label: "Data Migration Done (old Campaign)", canonical: "DELIVERED", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854640", label: "Metadata Matched (old Campaign)", canonical: "DELIVERED", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854641", label: "Payment Initiation (old Campaign)", canonical: "PAYMENT", kind: "live", note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854643", label: "Dead/ColdCall/Not Interested (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "NOT_INTERESTED", depth_reached: 2, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4002503384", label: "Dead/ColdCall/WrongFit (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "WRONG_FIT", depth_reached: 0, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4099442394", label: "Dead/ColdCall/WrongNumber (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "BAD_CONTACT", depth_reached: 1, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4103772885", label: "Dead/ColdCall/NoPickup (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "NO_RESPONSE", depth_reached: 1, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4002503385", label: "Dead/Interested/NoShow (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 4, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4103772886", label: "Dead/GMeet/NoShow (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 4, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4103772887", label: "Dead/GMeet/Cancelled (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "MEETING_CANCELLED", depth_reached: 4, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854644", label: "Dead/GMeet/wrong fit (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 5, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854645", label: "Dead/GMeet/Privacy Concerns (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "PRIVACY", depth_reached: 5, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4103772888", label: "Dead/ScriptShared/NoShow (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "NO_SHOW", depth_reached: 6, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4018854646", label: "Dead/ResultsReceived/WrongFit-Rejected (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "REJECTED_BY_LH2", depth_reached: 8, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4068768453", label: "Dead/Negotiation/Pricing (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "main", pipeline_id: "2425754306", id: "4068768454", label: "Dead/Negotiation/Contractual (old Campaign)", canonical: "DEAD", kind: "dead", dead_reason: "COMMERCIAL", depth_reached: 9, note: "old Campaign stage id: label from legacy/hubspot/crm_mirror/enrich/full_funnel_report.py FLOW/TERMINAL_STAGE_IDS + docs/sop/funnel_tabs/03_3_stage_inventory_and_changes.md"}
+  - {account: "companyops", pipeline_id: "2464812771", id: "4080987861", label: "LinkedIn sent (deleted v5, restored with a new id)", alias_of: "4307081975", deleted_on: "2026-09-15", note: "legacy/companyOps/opsdata/restore_linkedin_branch.py + docs/OPSDATA_PIPELINE.md: the ids survive only in history; inherits the mapping of its successor via stage_alias"}
+  - {account: "companyops", pipeline_id: "2464812771", id: "4132224744", label: "LinkedIn connected (deleted v5, restored with a new id)", alias_of: "4307081976", deleted_on: "2026-09-15", note: "same as above"}

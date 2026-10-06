@@ -1,0 +1,91 @@
+# Account (HubSpot portal) and pipeline registry.  DATA, not code.
+#
+# Ground truth: docs/ARCHITECTURE.md section 0 (verified live 2026-10-04, see docs/discovery/*-funnel.md).
+#
+# Rules encoded here
+#   * `slug` is the account_id used as the scoping key in EVERY table of the unified DB.
+#   * Pipeline ids and stage ids are only unique inside a portal, so pipelines are always
+#     addressed as (account slug, pipeline id).  Never look anything up by pipeline label;
+#     labels are stored only to be refreshed from the API and to show in reports.
+#   * `env_key` is the NAME of the environment variable that holds the HubSpot private-app
+#     token.  The token itself lives only in .env (gitignored) and is read lazily through
+#     leadgen.config.get_secret(env_key).  Never put a token value in this file.
+#   * `timezone` is the HubSpot portal timezone (informational).  All reporting uses IST
+#     (report.timezone below) computed in code, never the portal timezone.
+#   * Pipeline ids are YAML strings on purpose ("2425754306", never a bare integer).
+#   * `cohort_start` / `cohort_exclude_migration_on` are per-pipeline report cohort config
+#     (docs/discovery/funnel-reports.md section 4.5): Cluster 2 was bulk-populated on
+#     2026-09-15 and the headline "in scope" inception excludes deals that joined on that
+#     date having been created before it.  The report shows both "in scope" and "all history".
+#
+# This file is mirrored into the account/pipeline tables by leadgen.db.seed_reference_data()
+# and by the seed INSERTs in db/migrations/0001_foundation.sql / 0002_canonical.sql;
+# tests/test_schema.py fails if the two ever drift apart.
+
+version: 1
+
+report:
+  timezone: Asia/Kolkata          # IST, fixed UTC+05:30, no DST
+  utc_offset_minutes: 330
+  day_close_ist: "18:30"          # the one sanctioned daily mail goes out at 18:30 IST
+
+accounts:
+  - slug: main
+    portal_id: 246754894
+    name: MAIN (codebase acquisition)
+    env_key: HUBSPOT_KEY_MAIN
+    timezone: Asia/Calcutta
+    ui_domain: app-na2.hubspot.com
+    currency: USD
+    pipelines:
+      - id: default
+        slug: coding
+        label: Coding
+        previous_labels: [Scraped]
+        order: 1
+      - id: "2425754306"
+        slug: coops_global
+        label: "CoOps ( Global )"
+        previous_labels: [Campaign]
+        order: 2
+
+  - slug: companyops
+    portal_id: 246897735
+    name: COMPANYOPS (ops-data build portal)
+    env_key: HUBSPOT_KEY_COMPANYOPS
+    timezone: US/Eastern
+    ui_domain: app-na2.hubspot.com
+    currency: USD
+    pipelines:
+      - id: default
+        slug: cluster1
+        label: Company Ops Cluster 1 India
+        previous_labels: []
+        order: 1
+      - id: "2464812771"
+        slug: cluster2
+        label: Company Ops Cluster 2 India
+        previous_labels: ["Company Ops Data"]
+        order: 2
+        cohort_start: "2026-09-15"
+        cohort_exclude_migration_on: "2026-09-15"
+
+  - slug: rat
+    portal_id: 247485022
+    name: RAT (Rapid Action Team)
+    env_key: HUBSPOT_KEY_RAT
+    timezone: US/Eastern
+    ui_domain: app-na2.hubspot.com
+    currency: USD
+    pipelines:
+      - id: "2575252183"
+        slug: rat
+        label: Rapid Action Team
+        previous_labels: []
+        order: 1
+    # HubSpot's stock pipeline.  It holds 1 sample deal and is unused: it is still seeded (so a
+    # deal sitting in it satisfies the FK) but flagged is_reporting_funnel = 0 and ignored by every report.
+    ignored_pipelines:
+      - id: default
+        label: Deals pipeline
+        order: 2

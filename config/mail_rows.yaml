@@ -1,0 +1,119 @@
+# Row mapping of the "Supply Funnel Report by Vertical" mail (leadgen/reports/vertical_mail.py).  DATA, not code.
+#
+# Each PDF row label maps to the REAL stage label(s) inside one (account, pipeline_id) of the local database.  A row lists `labels`
+# (exact stage.label values, matched inside that pipeline only) or `label_prefix` (every stage of the pipeline whose label starts
+# with the prefix: used for the Dead row).  `entry: true` marks the entry row (Leads Assigned / Cold Lead / Cold Called Assigned):
+# it counts ANY source, every other row counts human CRM_UI moves only (the report.yaml per_rung basis).
+#
+# Labels are matched exactly; a label that is not in the stage table of the pipeline makes the renderer fail loudly (tests check it).
+# `any_source: true` (Closed/Won) counts every source, as report.yaml won_to_date does.
+# `won_row` is the row whose inception drives the WINS tile; `samples_row` drives the RAT SAMPLES RECEIVED tile.
+verticals:
+  - key: coding
+    title: "Coding Funnel"
+    account: main
+    pipeline_id: default
+    tile: wins
+    won_row: "Closed/Won"
+    rows:
+      - {name: "Leads Assigned",             labels: ["Cold Call"], entry: true}
+      - {name: "No Pickup",                  labels: ["No Pickup"]}
+      - {name: "Interested",                 labels: ["Interested"]}
+      - {name: "GMeet Fixed",                labels: ["GMeet Fixed"]}
+      - {name: "Script Shared",              labels: ["Script Shared"]}
+      - {name: "Script Results Received",    labels: ["Script Results Received"]}
+      - {name: "Commercial Negotiation",     labels: ["Commercial Negotiation"]}
+      - {name: "LOI",                        labels: ["LOI"]}
+      - {name: "Deal Contract Signed",       labels: ["Deal Contract Signed"]}
+      - {name: "Closed/Won",                 labels: ["Closed/Won"], any_source: true}
+      - {name: "Dead",                       label_prefix: "Dead"}
+
+  - key: coops_global
+    title: "Company Ops Global"
+    account: main
+    pipeline_id: "2425754306"
+    tile: wins
+    won_row: "Closed/Won"
+    rows:
+      - {name: "Cold Lead",                  labels: ["Cold Lead"], entry: true}
+      - {name: "Communicated",               labels: ["Communicated"]}
+      - {name: "No Response",                labels: ["No Response"]}
+      - {name: "Interested",                 labels: ["Interested"]}
+      - {name: "VC Fixed",                   labels: ["VC Fixed"]}
+      - {name: "1 Pager Shared",             labels: ["1 Pager Shared"]}
+      - {name: "1 Pager Output Received",    labels: ["1 Pager Output Received"]}
+      - {name: "Commercial Negotiation",     labels: ["Commercial Negotiation"]}
+      - {name: "LOI Signed",                 labels: ["LOI Signed"]}
+      - {name: "Contract Signed",            labels: ["Contract Signed"]}
+      - {name: "Closed/Won",                 labels: ["Closed/Won"], any_source: true}
+      - {name: "Dead",                       label_prefix: "Dead"}
+
+  - key: cluster1
+    title: "Company Ops Cluster 1 India"
+    account: companyops
+    pipeline_id: default
+    tile: wins
+    won_row: "Closed/Won"
+    # Cluster 1 rows as set by the user (2026-10-06). Cluster 1 has no 'Discovery Call Done' stage: it is derived as the deals
+    # that went past the discovery call into any post-discovery stage (one pager, LOI, contract, payment, ops handover).
+    rows:
+      - {name: "Leads Assigned",                 labels: ["Cold called assigned"], entry: true}
+      - {name: "No Pickup/Callback",             labels: ["No pickup"]}
+      - {name: "Replied",                        labels: ["Replied"]}
+      - {name: "Discovery Call Scheduled",       labels: ["Discovery call"]}
+      - {name: "Dead: Discovery Call No Show",   labels: ["Dead: Discovery Call / No Show"]}
+      - {name: "Discovery Call Done",            labels: ["One pager requested", "One pager follow up", "One pager received", "LOI signed", "Contract signed", "Payment initiation", "Ops data handover done"], overlap: true}
+      - {name: "One Pager Shared",               labels: ["One pager requested"]}
+      - {name: "One Pager Received",             labels: ["One pager received"]}
+      - {name: "LOI Signed",                     labels: ["LOI signed"]}
+      - {name: "Ops Handover",                   labels: ["Ops data handover done"]}
+      - {name: "Dead Cold Call: Wrong Number",   labels: ["Dead: Cold Call / Wrong Number"]}
+      - {name: "Dead Cold Call: Wrong Fit",      labels: ["Dead: Cold Call / Wrong Fit"]}
+      - {name: "Dead Cold Call: Not Interested", labels: ["Dead: Cold Call / Not Interested"]}
+      - {name: "Dead Cold Call: No Pickup",      labels: ["Dead: Cold Call / No Pickup"]}
+
+  - key: cluster2
+    title: "Company Ops Cluster 2 India"
+    account: companyops
+    pipeline_id: "2464812771"
+    tile: wins
+    won_row: "Closed/Won"
+    rows:
+      # Inception of the cold call row counts only leads that ENTERED cold call on/after 16 Sep, the day after the 15 Sep bulk migration (user, 2026-10-06).
+      # Every other row keeps its full history: those deals already moved through the funnel before they joined this cluster.
+      - {name: "Leads Assigned",             labels: ["Cold called assigned"], entry: true, inception_from: "2026-09-16"}
+      - {name: "LinkedIn Connected",         labels: ["LinkedIn connected", "LinkedIn connected (deleted v5, restored with a new id)"]}
+      - {name: "No Pickup / Callback",       labels: ["No pickup", "Retired: Callback +1 day (use No pickup + task instead)"]}
+      - {name: "Replied",                    labels: ["Replied"]}
+      - {name: "1st Interest",               labels: ["1st interest sent", "1st interest follow up"]}
+      - {name: "Discovery Call Scheduled",   labels: ["Discovery call", "Call rescheduled"]}
+      - {name: "One Pager Requested",        labels: ["One pager requested"]}
+      - {name: "One Pager Follow Up",        labels: ["One pager follow up"]}
+      - {name: "One Pager Received",         labels: ["One pager received"]}
+      - {name: "LOI Signed",                 labels: ["LOI signed"]}
+      - {name: "Contract Signed",            labels: ["Contract signed"]}
+      - {name: "Ops Data Handover",          labels: ["Ops data handover done"]}
+      - {name: "Payment Initiation",         labels: ["Payment initiation"]}
+      - {name: "Closed/Won",                 labels: ["Closed/Won"], any_source: true}
+      - {name: "Dead",                       label_prefix: "Dead"}
+
+  - key: rat
+    title: "Rapid Action Team"
+    account: rat
+    pipeline_id: "2575252183"
+    tile: samples
+    samples_row: "Sample Received"
+    rows:
+      - {name: "Cold Called Assigned",       labels: ["Cold Called Assigned"], entry: true}
+      - {name: "No Pickup/Callback",         labels: ["No Pickup", "Callback"]}
+      - {name: "Replied",                    labels: ["Replied"]}
+      - {name: "1st Interest Sent",          labels: ["1st Interest Sent"]}
+      - {name: "Discovery Call Scheduled",   labels: ["Discovery Call"]}
+      - {name: "Call Rescheduled",           labels: ["Call Rescheduled"]}
+      - {name: "Sample Requested",           labels: ["Sample Requested"]}
+      - {name: "Sample Follow Up",           labels: ["Sample Follow Up"]}
+      - {name: "Sample Received",            labels: ["Sample Received"]}
+      - {name: "Negotiation",                labels: ["Negotiation"]}
+      - {name: "Contract Signed",            labels: ["Contract Signed"]}
+      - {name: "Ops Data Handover Done",     labels: ["Ops Data Handover Done"]}
+      - {name: "Payment Initiation",         labels: ["Payment Initiation"]}

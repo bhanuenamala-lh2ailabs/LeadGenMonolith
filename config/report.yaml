@@ -1,0 +1,366 @@
+# The ONE metric dictionary of the unified daily funnel report.  DATA, not code.
+#
+# Every metric is defined exactly once here (name, definition, stages, source filter, window, scope) and computed exactly once in
+# leadgen/reports/metrics.py (the `fn` key names the function; tests/test_reports.py fails if a dictionary entry has no function or a
+# function has no entry).  Canonical rungs come from config/canonical_stages.yaml, native stages are mapped by config/stage_map.yaml;
+# nothing here looks a pipeline or a stage up by LABEL except the clearly marked `legacy_rows` cross-check block, whose labels are the
+# legacy reports' own vocabulary and are resolved to (account, pipeline_id, stage_id) inside the pipeline named next to them.
+#
+# Semantics (CONTEXT.md standing rule 10 + docs/discovery/funnel-reports.md; deviations are listed in docs/REPORTS.md):
+#   * IST calendar day = deal_stage_event.ist_day (UTC+05:30), never the portal timezone.
+#   * source filter  human = source_type CRM_UI (deal_stage_event.is_human = 1);  any = every source.
+#   * Engaged = human stage moves only.  API / integration / bulk pushes never count.
+#   * Entry rungs (SOURCED, LI_SENT) count any source.  Derived rungs (MEETING_HELD, EVALUATED) are distinct-deal metrics, any source.
+#   * Entries are de-duplicated on (deal, stage or rung, actor, IST day, human/auto) - the dashboards' own de-dup.
+#   * Inception is ALL-TIME, as-of the report day, and only grows.  It is never re-seeded from a cutoff (the 30 Sep "since 15 Sep"
+#     variant was rejected by the user).  The post-bulk-migration figure is shown ONLY as a clearly labelled secondary number.
+version: 1
+metrics_version: "1.0.0"
+
+timezone: Asia/Kolkata
+window:
+  days: 7                       # Roll7 = SUM over the 7 IST days ending on the report day; Prev7 = the 7 before
+  trend_days: 14                # days of sparkline / small-multiple history in the report
+  pct_min_prev: 10              # a percentage change is shown only when BOTH windows are complete (n of 7 = 7) and prev >= this; else absolute delta / "new"
+  stale_sync_hours: 36          # a funnel whose last successful deals sync is older than this at report time is flagged stale (informational)
+  no_event_lookback_days: 14    # days with no events listed in the integrity panel
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# The five funnels, in report order.  Keyed by funnel_slug (pipeline.funnel_slug), which is keyed by (account, pipeline_id) in the DB.
+# `reps` are the people the report always lists (by e-mail, resolved through the owner table of that account); anyone else with a
+# human move in the window or a live deal appears under "other owners".  Names are never hard-coded: they come from the owner table.
+# ---------------------------------------------------------------------------------------------------------------------------
+funnels:
+  - {slug: coding,       name: "Coding",            portal: "MAIN",       cohort_note: ""}
+  - {slug: coops_global, name: "CoOps (Global)",    portal: "MAIN",       cohort_note: ""}
+  - {slug: cluster1,     name: "Cluster 1 India",   portal: "COMPANYOPS", cohort_note: ""}
+  - {slug: cluster2,     name: "Cluster 2 India",   portal: "COMPANYOPS", cohort_note: "bulk-populated on 2026-09-15"}
+  - {slug: rat,          name: "Rapid Action Team", portal: "RAT",        cohort_note: ""}
+
+reps:
+  coding:       [yuktha.anand@lh2.ai, lamiya.saleem@lh2.ai, ishpreet.sood@lh2.ai, shobit.gupta@lh2.ai, shagufta.khan@lh2.ai, akarsh.g@lh2.ai]
+  coops_global: [akarsh.g@lh2.ai, shobit.gupta@lh2.ai, yuktha.anand@lh2.ai]
+  cluster1:     [amisha.pujari@lh2.ai, manit.rastogi@lh2.ai, r.kalyan@lh2.ai]
+  cluster2:     [vaishnavi.kannan@lh2.ai, tanisha.sharma@lh2.ai]
+  rat:          [prerna.jain@lh2.ai, harsha.a@lh2.ai]
+
+# Order of the rows in every canonical table: canonical_stages.yaml order, with DEAD last and an UNMAPPED catch-all appended when needed.
+combined_row_note: "Rows follow config/canonical_stages.yaml; dead is split by canonical dead reason."
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# METRIC DICTIONARY - each metric once.
+#   source : human | any | per_rung   (per_rung = entry/derived rungs any source, every other rung human only: the legacy dashboard basis)
+#   unit   : entries (de-duplicated event count) | deals (distinct deals) | state (a point-in-time count)
+# ---------------------------------------------------------------------------------------------------------------------------
+metrics:
+  rung_entries:
+    name: Stage entries (headline basis)
+    fn: rung_entries
+    definition: >
+      Entries into a canonical rung (or a native stage) on an IST day, de-duplicated on (deal, stage or rung, actor, day).  Headline basis
+      per_rung: entry rungs (Sourced/Assigned, LinkedIn sent) and derived rungs count any source; every other rung counts CRM_UI (human)
+      moves only.  Human, Automated and Total are always carried beside the headline number.
+    rungs: all
+    source: per_rung
+    unit: entries
+    window: Today = report day; Yesterday = day-1; Roll7 = sum of 7 daily values; Prev7 = the 7 days before
+    scope: per funnel and combined (all five funnels)
+  deals_entered:
+    name: Distinct deals entered
+    fn: deals_entered
+    definition: >
+      Distinct deals that entered a rung / native stage inside the window.  Distinct deals are NOT summed across days.
+    rungs: all
+    source: human and any (both carried)
+    unit: deals
+    window: Today, Roll7 (union over 7 days)
+    scope: per funnel and combined
+  inception:
+    name: Inception (ever reached)
+    fn: inception
+    definition: >
+      Distinct deals that EVER entered the rung / native stage, all time up to the report day, any source (the human-only subset is carried
+      beside it).  Never re-seeded from a cutoff; a deal that dies and is revived counts once.  Because it is distinct deals it can be lower
+      than the sum of entries.
+    rungs: all
+    source: any
+    unit: deals
+    window: all time up to the report day
+    scope: per funnel and combined
+  inception_in_scope:
+    name: Inception since the cohort start (secondary, clearly labelled)
+    fn: inception
+    definition: >
+      Secondary figure for pipelines with a cohort rule (Cluster 2: joined on/after 2026-09-15, excluding deals created before that day that
+      joined on it = the bulk migration).  Shown beside, never instead of, all-time Inception.  The 30 Sep headline variant was rejected by the user.
+    rungs: all
+    source: any
+    unit: deals
+    window: all time up to the report day, restricted to the cohort
+    scope: pipelines with cohort_start (v_deal_cohort.in_scope)
+  leads_assigned:
+    name: Leads assigned (new leads)
+    fn: leads_assigned
+    definition: >
+      Entries into the entry rung SOURCED (Cold Call / Cold Lead / Cold called assigned), any source, plus the distinct deals whose first-ever stage entry falls on the day.
+    rungs: [SOURCED]
+    source: any
+    unit: entries and deals
+    window: Today, Yesterday, Roll7, Prev7
+    scope: per funnel and combined
+  engaged_daily:
+    name: Leads engaged (day)
+    fn: engaged
+    definition: >
+      Distinct deals with at least one CRM_UI (human) stage move on the IST day.  Entry-stage moves count when they are human clicks; API / integration / bulk pushes never count.  Stage moves only (no notes).
+    rungs: all
+    source: human
+    unit: deals
+    window: Today, Yesterday
+    scope: per funnel, per owner (credited to the actor) and combined
+  engaged_7d:
+    name: Leads engaged (7 days, union)
+    fn: engaged
+    definition: >
+      SET UNION of the distinct engaged deals over the 7 IST days ending on the report day (a deal touched on two days counts once).  Labelled "n of 7 days" when the window is only partly covered by the store / the sync.
+    rungs: all
+    source: human
+    unit: deals
+    window: Roll7 (union); Prev7 (union)
+    scope: per funnel, per owner and combined
+  net_new_engaged:
+    name: Net new engaged
+    fn: engaged
+    definition: >
+      Engaged deals whose earliest-ever human event falls on the day, minus the reject set (the deal has entered a BAD_CONTACT dead stage on or before that day).  Stage-based only; the note-based reject buckets are not available (no note classifier output).
+    rungs: all
+    source: human
+    unit: deals
+    window: Today
+    scope: per funnel and per owner
+  occupancy_now:
+    name: Occupancy (live stage counts)
+    fn: occupancy
+    definition: >
+      Deals sitting in the stage at the end of the report day (for the current day: deal.stage_id, archived deals excluded - matches the HubSpot board columns).  Live / dead / won split by canonical rung; dead by reason.  Never a cumulative push total.
+    rungs: all
+    source: any
+    unit: state
+    window: end of the report day
+    scope: per funnel, per native stage, per owner and combined
+  dead_by_reason:
+    name: Dead by canonical reason
+    fn: dead_breakdown
+    definition: >
+      For each canonical dead reason (stage_map.dead_reason_code): deals sitting in dead stages of that reason now, entries today / Roll7, and distinct deals ever (Inception).  Reasons come from the stage map, never from label text.
+    rungs: [DEAD]
+    source: per_rung (human)
+    unit: entries, deals, state
+    window: now, Today, Roll7, all time
+    scope: per funnel and combined
+  meetings_held:
+    name: Meeting held (derived)
+    fn: derived_rungs
+    definition: >
+      DERIVED rung (no native stage).  A deal with a MEETING_BOOKED entry that later reached an asset rung (depth >= 6, live) or a post-meeting
+      dead stage (stage_map.depth_reached >= 5 with reason REJECTED_BY_LH2, NOT_INTERESTED or PRIVACY) and did not enter a NO_SHOW or
+      MEETING_CANCELLED stage on or before the day that evidence arrived (so the rung only ever grows).  Credited to the day of the first MEETING_BOOKED entry (no gmeet1_date / discovery_call_date is populated in
+      deal.props_json, so the spec's meeting-day credit is not available).  Distinct deals, any source.
+    rungs: [MEETING_HELD]
+    source: any
+    unit: deals
+    window: Today, Roll7, Inception
+    scope: per funnel and combined
+  evaluated:
+    name: Evaluated (derived)
+    fn: derived_rungs
+    definition: >
+      DERIVED rung.  A deal that had entered ASSET_RECEIVED and then entered a post-evaluation outcome - a dead stage with depth_reached >= 8 or a live/won rung of depth >= 9.  Credited to the day of the first such outcome.  Distinct deals, any source.
+    rungs: [EVALUATED]
+    source: any
+    unit: deals
+    window: Today, Roll7, Inception
+    scope: per funnel and combined
+  won_to_date:
+    name: Won to date
+    fn: inception
+    definition: >
+      Distinct deals that ever entered the WON rung (Closed/Won only; contract signed and payment are separate rungs).  The currently-won occupancy is shown beside it.
+    rungs: [WON]
+    source: any
+    unit: deals
+    window: all time up to the report day
+    scope: per funnel and combined
+  contracts_signed_7d:
+    name: Contracts signed (7 days)
+    fn: rung_entries
+    definition: >
+      Roll7 headline entries into the CONTRACT rung (human).
+    rungs: [CONTRACT]
+    source: human
+    unit: entries
+    window: Roll7
+    scope: per funnel and combined
+  change:
+    name: Change
+    fn: change
+    definition: >
+      Absolute delta (Roll7 - Prev7, Today - Yesterday).  A percentage is added only when both windows are complete (7 of 7) and the earlier value is >= window.pct_min_prev; an earlier value of 0 with a later value > 0 reads "new".
+    rungs: all
+    source: n/a
+    unit: delta
+    window: Roll7 vs Prev7, Today vs Yesterday
+    scope: every table
+  cold_lead_country:
+    name: CoOps (Global) Cold Lead by country
+    fn: cold_lead_country
+    definition: >
+      Live (non-archived) deals sitting in the entry stage of CoOps (Global), grouped by country derived from the deal's lead_source label with the ordered rules in `cold_lead_country_rules` (CoOps has no Country property).
+    rungs: [SOURCED]
+    source: any
+    unit: state
+    window: now (as of the last sync)
+    scope: coops_global
+  freshness:
+    name: Data freshness and integrity
+    fn: integrity
+    definition: >
+      Last successful sync per account, newest event, days without events, unmapped stages (v_unmapped_stage), archived counts, open data-quality findings (v_dq_open and the DQ views), pipelines ignored by every report.
+    rungs: n/a
+    source: n/a
+    unit: state
+    window: now
+    scope: all accounts
+  legacy_crosscheck:
+    name: Cross-check against the legacy snapshots
+    fn: crosscheck
+    definition: >
+      Recomputed values vs the imported legacy snapshots (rpt_legacy_snapshot) for the same day, with the delta and the classified reason.  Neither side is ever silently adjusted; the legacy snapshots are used for cross-checking only.
+    rungs: n/a
+    source: n/a
+    unit: mixed
+    window: the report day and up to 4 earlier days where both exist
+    scope: every legacy family
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# CoOps (Global) Cold Lead by country (the user asked for it on 2026-10-04; the live answer was 725 = US 358, UK 209, Singapore 100,
+# Australia 51, Georgia 7 - a built-in regression anchor).  Rules are ORDERED regexes on the lead_source LABEL, first match wins.
+# ---------------------------------------------------------------------------------------------------------------------------
+cold_lead_split:
+  funnel: coops_global
+  rung: SOURCED
+  rules:
+    - {country: UK,        pattern: '^UK_'}
+    - {country: US,        pattern: '(^US_EST)|(_US$)|(Proptech US)'}
+    - {country: Australia, pattern: '^(Outflo_)?Australia'}
+    - {country: Singapore, pattern: '^(Outflo_)?Singapore'}
+    - {country: Georgia,   pattern: '^(Outflo_)?Georgia'}
+  unmatched: Unattributed
+  order: [US, UK, Singapore, Australia, Georgia, Unattributed]
+
+# Regression anchors: asserted by tests/test_reports.py against the live database and echoed in the integrity panel on the anchor day.
+anchors:
+  - id: coops_cold_lead_2026_10_04
+    day: "2026-10-04"
+    description: "CoOps (Global) Cold Lead by country, live answer given to the user on 2026-10-04"
+    total: 725
+    split: {US: 358, UK: 209, Singapore: 100, Australia: 51, Georgia: 7}
+  - id: live_deals_2026_10_04
+    day: "2026-10-04"
+    description: "Live HubSpot deal counts per pipeline reported by the sync agent on 2026-10-04"
+    funnel_deals: {coding: 4821, coops_global: 1380, cluster1: 1135, cluster2: 6440, rat: 1236}
+
+# DQ rules that mean "history could not be read / an event was dropped" (rpt_report_run.history_failures counts their occurrences).
+history_failure_rules: [history_read_failed, ambiguous_stage_pipeline]
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# Legacy cross-check vocabulary.  LABELS BELOW ARE THE LEGACY REPORTS' OWN ROW / STAGE NAMES (docs/discovery/funnel-reports.md 2.1-2.3);
+# they are resolved to stage ids inside the named (account, pipeline_id) at run time and exist only to translate old snapshots.
+#   family     : rpt_legacy_snapshot.source_family
+#   scope      : the (account, pipeline_id) pairs the legacy snapshot covered ('*' = every reporting pipeline of the account)
+#   rows       : legacy dashboard row -> native stage labels (+ any_source for the entry row; 'dead' = every dead stage)
+# ---------------------------------------------------------------------------------------------------------------------------
+legacy_rows:
+  companyops_cluster:
+    any_source_rows: ["Leads Assigned"]
+    rows:
+      "Leads Assigned":            {stages: ["Cold called assigned"]}
+      "LinkedIn Connected":        {stages: ["LinkedIn connected"]}
+      "No Pickup / Callback":      {stages: ["No pickup", "Retired: Callback +1 day (use No pickup + task instead)"]}
+      "Replied":                   {stages: ["Replied"]}
+      "1st Interest":              {stages: ["1st interest sent", "1st interest follow up"]}
+      "Discovery Call Scheduled":  {stages: ["Discovery call", "Call rescheduled"]}
+      "One Pager Requested":       {stages: ["One pager requested"]}
+      "One Pager Follow Up":       {stages: ["One pager follow up"]}
+      "One Pager Received":        {stages: ["One pager received"]}
+      "LOI Signed":                {stages: ["LOI signed"]}
+      "Contract Signed":           {stages: ["Contract signed"]}
+      "Ops Data Handover":         {stages: ["Ops data handover done"]}
+      "Payment Initiation":        {stages: ["Payment initiation"]}
+      "Closed/Won":                {stages: ["Closed/Won"]}
+      "Dead":                      {dead: true}
+  rat:
+    any_source_rows: ["Cold Called Assigned"]
+    rows:
+      "Cold Called Assigned":      {stages: ["Cold Called Assigned"]}
+      "No Pickup/Callback":        {stages: ["No Pickup", "Callback"]}
+      "Replied":                   {stages: ["Replied"]}
+      "1st Interest Sent":         {stages: ["1st Interest Sent"]}
+      "Discovery Call Scheduled":  {stages: ["Discovery Call"]}
+      "Call Rescheduled":          {stages: ["Call Rescheduled"]}
+      "Sample Requested":          {stages: ["Sample Requested"]}
+      "Sample Follow Up":          {stages: ["Sample Follow Up"]}
+      "Sample Received":           {stages: ["Sample Received"]}
+      "Negotiation":               {stages: ["Negotiation"]}
+      "Contract Signed":           {stages: ["Contract Signed"]}
+      "Ops Data Handover Done":    {stages: ["Ops Data Handover Done"]}
+      "Payment Initiation":        {stages: ["Payment Initiation"]}
+      "Closed / Won":              {stages: ["Closed / Won"]}
+      "Dead":                      {dead: true}
+  main_coopsglobal:
+    any_source_rows: ["Cold Lead"]
+    rows:
+      "Cold Lead":                 {stages: ["Cold Lead"]}
+      "Communicated":              {stages: ["Communicated"]}
+      "No Response":               {stages: ["No Response"]}
+      "Interested":                {stages: ["Interested"]}
+      "VC Fixed":                  {stages: ["VC Fixed"]}
+      "1 Pager Shared":            {stages: ["1 Pager Shared"]}
+      "1 Pager Output Received":   {stages: ["1 Pager Output Received"]}
+      "Commercial Negotiation":    {stages: ["Commercial Negotiation"]}
+      "LOI Signed":                {stages: ["LOI Signed"]}
+      "Contract Signed":           {stages: ["Contract Signed"]}
+      "Closed/Won":                {stages: ["Closed/Won"]}
+      "Dead":                      {dead: true}
+  main_full:
+    any_source_rows: ["Leads Assigned"]
+    rows:
+      "Leads Assigned":            {stages: ["Cold Call"]}
+      "No Pickup":                 {stages: ["No Pickup"]}
+      "Interested":                {stages: ["Interested"]}
+      "GMeet Fixed":               {stages: ["GMeet Fixed"]}
+      "Script Shared":             {stages: ["Script Shared"]}
+      "Script Results Received":   {stages: ["Script Results Received"]}
+      "Commercial Negotiation":    {stages: ["Commercial Negotiation"]}
+      "LOI":                       {stages: ["LOI"]}
+      "Deal Contract Signed":      {stages: ["Deal Contract Signed"]}
+      "Closed/Won":                {stages: ["Closed/Won"]}
+      "Dead":                      {dead: true}
+legacy_families:
+  companyops_cluster: {scope: "pipeline"}      # one series per cluster pipeline (snapshot.pipeline_id)
+  rat:                {scope: "pipeline"}
+  main_coopsglobal:   {scope: "pipeline"}
+  main_full:          {scope: "account"}       # whole MAIN portal, both pipelines, label-matched
+  main_coding:        {scope: "pipeline"}      # scoped by lead_source in the legacy script, by pipeline here
+  main_owner:         {scope: "account"}       # per-owner series (owner_hs_id)
+crosscheck_days: 5
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# Mail.  Dry-run by default; `--send` is the ONLY path that mails.  The only recipient allowed by default is the one below.
+# Transport: Gmail API, users.messages.send, scope gmail.send.  Tokens are tried in order; none is ever printed.
+# ---------------------------------------------------------------------------------------------------------------------------
+mail:
+  default_to: bhanu.enamala@lh2.ai
+  subject: "LH2 Funnel - Daily Report - {date} (IST)"
+  scope: https://www.googleapis.com/auth/gmail.send
+  token_files: [companyops_gmail_send_token.json, hubspot_gmail_send_token_dashboard.json, hubspot_gmail_send_token_crm_mirror.json, rat_gmail_send_token.json]

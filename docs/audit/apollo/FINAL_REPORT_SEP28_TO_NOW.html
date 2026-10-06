@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Apollo credits: 28 Sep to now</title>
+<style>
+  :root { --bg:#f6f7f9; --fg:#1d2330; --muted:#5b6474; --card:#ffffff; --line:#e2e5eb; --accent:#1f5fbf; --warn:#b5561b; --good:#1a7f37; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0f1218; --fg:#e7eaf0; --muted:#9aa3b2; --card:#171c25; --line:#2a3140; --accent:#7aa8ff; --warn:#f0a06a; --good:#5fd38a; color-scheme: dark } }
+  :root[data-theme="dark"] { --bg:#0f1218; --fg:#e7eaf0; --muted:#9aa3b2; --card:#171c25; --line:#2a3140; --accent:#7aa8ff; --warn:#f0a06a; --good:#5fd38a; color-scheme: dark }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { padding-block: 24px; padding-inline: 16px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; text-wrap: balance; }
+  h2 { font-size: 17px; margin: 28px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  p, li { color: var(--fg); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .kpis { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; min-width: 160px; flex: 1 1 160px; }
+  .kpi .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kpi .l { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .tablewrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; }
+  table { border-collapse: collapse; width: 100%; min-width: 480px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--bg); }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.total td { font-weight: 700; }
+  .flag { color: var(--warn); font-weight: 600; }
+  .ok { color: var(--good); font-weight: 600; }
+  .note { background: var(--card); border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 6px; margin: 10px 0; }
+  ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Apollo credits: 28 Sep to now</h1>
+<p class="muted">Where each credit went, what it bought, and what reached HubSpot. Built from the repo's ledger (`docs/audit/apollo/master_ledger.csv`), the push progress files in `data/audit/`, and the teammate's audit. Credits are from the ledger; HubSpot outcomes are from the progress files. Estimates are marked.</p>
+
+<div class="kpis">
+  <div class="kpi"><div class="v">25,371</div><div class="l">Credits, 28 Sep to 4 Oct (ledger)</div></div>
+  <div class="kpi"><div class="v">214</div><div class="l">Apollo-fed deals in HubSpot</div></div>
+  <div class="kpi"><div class="v">~10,485</div><div class="l">Credits on phone-related events</div></div>
+  <div class="kpi"><div class="v">99,281</div><div class="l">Apollo cycle total (meter, 5 Oct)</div></div>
+  <div class="kpi"><div class="v">4,999</div><div class="l">Lead credits left (meter, 5 Oct)</div></div>
+</div>
+
+<h2>1. Credits by purpose and repo, 28 Sep to 4 Oct</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Repo</th><th>Purpose</th><th class="n">Credits</th><th class="n">Events</th></tr></thead>
+<tbody>
+<tr><td>hubspot_scraping</td><td>IT Services push (POC reveal)</td><td class="n">5,706</td><td class="n">5</td></tr>
+<tr><td>hubspot_scraping</td><td>COBOL India POC enrichment</td><td class="n">3,805</td><td class="n">24</td></tr>
+<tr><td>companyOps</td><td>EdTech TAM (Cluster 1)</td><td class="n">3,586</td><td class="n">62</td></tr>
+<tr><td>companyOps</td><td>Other / unclassified</td><td class="n">3,253</td><td class="n">98</td></tr>
+<tr><td>hubspot_scraping</td><td>UK PropTech / UK candidates</td><td class="n">2,316</td><td class="n">6</td></tr>
+<tr><td>companyOps</td><td>Fintech TAM (Cluster 2)</td><td class="n">2,041</td><td class="n">31</td></tr>
+<tr><td>hubspot_scraping</td><td>Other / unclassified</td><td class="n">1,752</td><td class="n">32</td></tr>
+<tr><td>RapidActionTeam</td><td>CAD-200 founder / phone enrichment</td><td class="n">1,751</td><td class="n">32</td></tr>
+<tr><td>companyOps</td><td>COBOL India POC enrichment</td><td class="n">864</td><td class="n">4</td></tr>
+<tr><td>companyOps</td><td>Waterfall cycle (unattributed)</td><td class="n">161</td><td class="n">2</td></tr>
+<tr><td>hubspot_scraping</td><td>Waterfall cycle (unattributed)</td><td class="n">98</td><td class="n">1</td></tr>
+<tr><td>RapidActionTeam</td><td>Other / unclassified</td><td class="n">38</td><td class="n">3</td></tr>
+<tr class="total"><td colspan="2">Total</td><td class="n">25,371</td><td class="n">300</td></tr>
+</tbody></table></div>
+<p class="muted">The 3,018-credit `reveal_pocs.py` run (3 to 4 Oct) sits inside the IT Services line. The 2,400-credit `itsvc-tam` run is also in it.</p>
+
+<h2>2. What reached HubSpot, by source</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Source</th><th class="n">Enriched</th><th class="n">Phone found (+91)</th><th class="n">Pushed (deal + contact)</th><th>Held here</th></tr></thead>
+<tbody>
+<tr><td>IT Services push</td><td class="n">249 delivered (ledger)</td><td class="n">not recorded</td><td class="n">204</td><td class="flag">45 unexplained gap</td></tr>
+<tr><td>COBOL India POC enrichment</td><td class="n">128 orgs</td><td class="n">13 leads</td><td class="n">8</td><td>5 (reason not recorded)</td></tr>
+<tr><td>EdTech TAM (Cluster 1, Manit)</td><td class="n">11 orgs</td><td class="n">3 leads</td><td class="n">2 (FluxGen, ScaNxt)</td><td>1 (MintCarb: contact is an Assistant Professor)</td></tr>
+<tr class="total"><td>Apollo-derived total</td><td></td><td></td><td class="n">214</td><td></td></tr>
+<tr><td colspan="5" class="muted">Fintech, UK PropTech, Australia, CAD-200, Healthcare/Medtech and CompanyOps verticals: spend is in the ledger, but their push logs are not in this repo. Their HubSpot outcomes are not counted here.</td></tr>
+</tbody></table></div>
+
+<h2>3. COBOL outcomes (128 organisations)</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Outcome</th><th class="n">Orgs</th></tr></thead>
+<tbody>
+<tr><td>Lead (CEO-tier contact and +91 mobile)</td><td class="n">13</td></tr>
+<tr><td>Organisation not found in Apollo</td><td class="n">61</td></tr>
+<tr><td>No CEO-tier contact</td><td class="n">12</td></tr>
+<tr><td>Headcount out of range (20 to 1,000)</td><td class="n">18</td></tr>
+<tr><td>No domain</td><td class="n">19</td></tr>
+<tr><td>No mobile</td><td class="n">4</td></tr>
+<tr><td>Headcount unknown</td><td class="n">1</td></tr>
+</tbody></table></div>
+
+<h2>4. Cost per HubSpot deal</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Source</th><th class="n">Credits (ledger)</th><th class="n">Deals</th><th class="n">Credits per deal</th></tr></thead>
+<tbody>
+<tr><td>IT Services push</td><td class="n">5,706</td><td class="n">204</td><td class="n">about 28</td></tr>
+<tr><td>COBOL (both repos)</td><td class="n">4,669</td><td class="n">8</td><td class="n">about 584</td></tr>
+<tr><td>EdTech TAM</td><td class="n">3,586</td><td class="n">2</td><td class="n">about 1,793</td></tr>
+</tbody></table></div>
+<p class="note">Most COBOL and EdTech credits went to organisations that never produced a CEO-tier contact or a +91 mobile.</p>
+
+<h2>5. Phone reveals</h2>
+<ul>
+<li>82 phone-related events from 28 Sep, about 10,485 credits.</li>
+<li>At 8 credits per returned mobile, that is roughly 1,300 mobiles at most. The ledger doesn't record mobiles per call, so this is an estimate.</li>
+<li>Apollo charges the 8 credits only when a mobile is returned, but our scripts recorded them whether or not one was.</li>
+</ul>
+
+<h2>6. Whole cycle, day by day (US Pacific, from our earlier audit)</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Day</th><th class="n">Apollo chart</th><th class="n">Traced</th><th class="n">Untraced</th><th class="n">% traced</th></tr></thead>
+<tbody>
+<tr><td>21 Sep</td><td class="n">12,500</td><td class="n">2,432</td><td class="n">10,068</td><td class="n">19%</td></tr>
+<tr><td>22 Sep</td><td class="n">6,800</td><td class="n">153</td><td class="n">6,647</td><td class="n">2%</td></tr>
+<tr><td>23 Sep</td><td class="n">5,600</td><td class="n">2,330</td><td class="n">3,270</td><td class="n">42%</td></tr>
+<tr><td>24 Sep</td><td class="n">12,400</td><td class="n">6,911</td><td class="n">5,489</td><td class="n">56%</td></tr>
+<tr><td>25 Sep</td><td class="n">3,000</td><td class="n">1,547</td><td class="n">1,453</td><td class="n">52%</td></tr>
+<tr><td>27 Sep</td><td class="n">4,600</td><td class="n">3,953</td><td class="n">647</td><td class="n">86%</td></tr>
+<tr><td>28 Sep</td><td class="n">9,300</td><td class="n">6,378</td><td class="n">2,922</td><td class="n">69%</td></tr>
+<tr><td>29 Sep</td><td class="n">13,800</td><td class="n">3,754</td><td class="n">10,046</td><td class="n">27%</td></tr>
+<tr><td>30 Sep</td><td class="n">14,800</td><td class="n">4,201</td><td class="n">10,599</td><td class="n">28%</td></tr>
+<tr><td>1 Oct</td><td class="n">7,100</td><td class="n">4,005</td><td class="n">3,095</td><td class="n">56%</td></tr>
+<tr><td>3 Oct</td><td class="n">6,200</td><td class="n">5,805</td><td class="n">395</td><td class="n">94%</td></tr>
+<tr class="total"><td>Total</td><td class="n">96,100</td><td class="n">41,469</td><td class="n">54,631</td><td class="n">43%</td></tr>
+</tbody></table></div>
+<p class="muted">The teammate's meter read gives a cycle total of 99,281, against our 96,100 read off the chart. Neither audit has Apollo's per-day series.</p>
+
+<h2>7. Traced credits by endpoint class (whole cycle)</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Endpoint</th><th class="n">Credits</th><th>Apollo's rule</th></tr></thead>
+<tbody>
+<tr><td>People match / phone reveal</td><td class="n">25,836 (phone) + 4,849 (match)</td><td>1 per match if data found, +8 per mobile returned, 0 if nothing found</td></tr>
+<tr><td>Org enrichment</td><td class="n">4,051</td><td class="flag">Billed: 1 per organisation (repos treated it as free)</td></tr>
+<tr><td>Org search</td><td class="n">3,715</td><td class="flag">Billed: 1 per page (repos treated it as free)</td></tr>
+<tr><td>Org search + enrich pipelines</td><td class="n">3,018</td><td class="flag">Billed</td></tr>
+<tr><td>People search (no reveal)</td><td class="n">0</td><td class="ok">Free, correctly</td></tr>
+</tbody></table></div>
+
+<h2>8. Balance and meter (read 5 Oct, free call)</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Credit type</th><th class="n">Limit</th><th class="n">Consumed</th><th class="n">Left over</th></tr></thead>
+<tbody>
+<tr><td>lead_credit (email and enrichment)</td><td class="n">104,280</td><td class="n">99,281</td><td class="n">4,999</td></tr>
+<tr><td>direct_dial_credit (same pool, do not add)</td><td class="n">n/a</td><td class="n">60,107</td><td class="n">n/a</td></tr>
+<tr><td>web_search_record_credit</td><td class="n">200</td><td class="n">-4,799</td><td class="n">4,999</td></tr>
+</tbody></table></div>
+<p class="note">Our notes earlier said about 7,294 left. The meter read says 4,999. Confirm with a fresh free read before relying on either.</p>
+
+<h2>9. Key rotation (corrected)</h2>
+<ul>
+<li><strong>29 Sep, 12:51 to 12:58 IST:</strong> the real rotation, applied to hubspot, companyOps and RapidActionTeam within about seven minutes.</li>
+<li><strong>30 Sep, 10:08 IST:</strong> a one-character typo fix in companyOps' copy of the same key. Not a second rotation.</li>
+<li>Source: the teammate's VS Code edit history, cross-checked by two agents.</li>
+</ul>
+
+<h2>10. Open items</h2>
+<ul>
+<li><span class="flag">45 deal gap</span> in the IT Services push: 249 delivered per ledger, 204 in the progress file.</li>
+<li><span class="flag">Stranded spend:</span> about 2,214 credits (CompanyOps Mumbai and IT Hyderabad) and 1,502 (Healthcare/Medtech Chennai) went into enrichment with no HubSpot push.</li>
+<li><span class="flag">"Out of credits"</span> has never been confirmed by Apollo. SignalHire's 402 is quoted twice; Apollo's is never quoted.</li>
+<li><span class="flag">Negative web_search_record_credit</span> (-4,799) in the meter. Recorded as returned, not explained.</li>
+<li><span class="flag">Missing push logs</span> for Fintech, UK PropTech, Australia, CAD-200, Healthcare/Medtech and CompanyOps verticals.</li>
+<li><span class="flag">Apollo per-user daily export</span>: the one source that would settle the gap. Not yet provided.</li>
+</ul>
+
+<h2>11. Current status</h2>
+<ul>
+<li>Apollo is paused (<code>APOLLO_PAUSED=1</code>). The only exception was the Nikita Mahamana lookup today, which was unpaused and re-paused.</li>
+<li>No bulk Apollo spend since 1 Oct 10:30 IST.</li>
+</ul>
+
+<h2>12. Segment by day (ours, from the ledger)</h2>
+<p class="muted">Each cell is credits in that segment on that IST day. Segments come from keyword matches on each ledger row's purpose text, so "Other / unclassified" is large and should not be read as one thing. Oct 4 has one credit from a test call and is not shown.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Segment</th><th class="n">Events</th><th class="n">28 Sep</th><th class="n">29 Sep</th><th class="n">30 Sep</th><th class="n">1 Oct</th><th class="n">2 Oct</th><th class="n">3 Oct</th><th class="n">Total</th></tr></thead>
+<tbody>
+<tr><td>IT Services push</td><td class="n">5</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">5,706</td><td class="n">5,706</td></tr>
+<tr><td>Other / unclassified</td><td class="n">133</td><td class="n">3,109</td><td class="n">209</td><td class="n">1,369</td><td class="n">223</td><td class="n">34</td><td class="n">99</td><td class="n">5,043</td></tr>
+<tr><td>COBOL India POC</td><td class="n">28</td><td class="n">0</td><td class="n">0</td><td class="n">864</td><td class="n">3,805</td><td class="n">0</td><td class="n">0</td><td class="n">4,669</td></tr>
+<tr><td>EdTech TAM (Cluster 1)</td><td class="n">62</td><td class="n">382</td><td class="n">1,932</td><td class="n">1,272</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">3,586</td></tr>
+<tr><td>UK PropTech</td><td class="n">6</td><td class="n">1,075</td><td class="n">0</td><td class="n">1,241</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">2,316</td></tr>
+<tr><td>Fintech TAM (Cluster 2)</td><td class="n">31</td><td class="n">141</td><td class="n">1,900</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">2,041</td></tr>
+<tr><td>CAD-200 founder / phone</td><td class="n">32</td><td class="n">1,751</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">1,751</td></tr>
+<tr><td>Waterfall (unattributed)</td><td class="n">3</td><td class="n">161</td><td class="n">98</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">259</td></tr>
+<tr class="total"><td>Total</td><td class="n">300</td><td class="n">6,619</td><td class="n">4,139</td><td class="n">4,746</td><td class="n">4,028</td><td class="n">34</td><td class="n">5,805</td><td class="n">25,371</td></tr>
+</tbody></table></div>
+<p class="note">The 3 Oct column is mostly the 5,706-credit IT Services run, which the ledger dates to 3 Oct. Its run actually spans 3 to 4 Oct.</p>
+
+<h2>13. Teammate's day-by-day, by repo (his audit, not ours)</h2>
+<p class="muted">Copied from his report, US Pacific days, 20 Sep to 4 Oct. Blanks are zero. He notes that some timestamps are approximate.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Day</th><th class="n">All repos</th><th class="n">hubspot_scraping</th><th class="n">companyOps</th><th class="n">RapidActionTeam</th></tr></thead>
+<tbody>
+<tr><td>20 Sep</td><td class="n">90</td><td class="n">90</td><td class="n">-</td><td class="n">-</td></tr>
+<tr><td>21 Sep</td><td class="n">8,875</td><td class="n">4,766</td><td class="n">-</td><td class="n">-</td></tr>
+<tr><td>22 Sep</td><td class="n">2,996</td><td class="n">511</td><td class="n">2,432</td><td class="n">-</td></tr>
+<tr><td>23 Sep</td><td class="n">4,479</td><td class="n">2,201</td><td class="n">-</td><td class="n">177</td></tr>
+<tr><td>24 Sep</td><td class="n">4,279</td><td class="n">-</td><td class="n">-</td><td class="n">30</td></tr>
+<tr><td>25 Sep</td><td class="n">957</td><td class="n">-</td><td class="n">-</td><td class="n">-</td></tr>
+<tr><td>27 Sep</td><td class="n">2,707</td><td class="n">2,706</td><td class="n">-</td><td class="n">1</td></tr>
+<tr><td>28 Sep</td><td class="n">9,730</td><td class="n">2,539</td><td class="n">890</td><td class="n">6,301</td></tr>
+<tr><td>29 Sep</td><td class="n">1,297</td><td class="n">10</td><td class="n">46</td><td class="n">1,241</td></tr>
+<tr><td>30 Sep</td><td class="n">6,957</td><td class="n">648</td><td class="n">1,973</td><td class="n">4,336</td></tr>
+<tr><td>1 Oct</td><td class="n">1,279</td><td class="n">-</td><td class="n">1,279</td><td class="n">-</td></tr>
+<tr><td>4 Oct</td><td class="n">1</td><td class="n">-</td><td class="n">1</td><td class="n">-</td></tr>
+</tbody></table></div>
+
+<h2>14. Side by side: what each audit can and cannot show</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Item</th><th>Ours</th><th>Teammate</th></tr></thead>
+<tbody>
+<tr><td>Segment (product line) per day</td><td>Yes, keyword-classified from the ledger purpose text</td><td>No. He groups by endpoint and repo</td></tr>
+<tr><td>Repo per day</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>Endpoint per day</td><td>Partial</td><td>Yes (by class, whole cycle)</td></tr>
+<tr><td>Apollo's own per-day chart</td><td>Read off a screenshot (±0.3k)</td><td>Not obtained (API has only the cycle total)</td></tr>
+<tr><td>Cycle total</td><td>96,100 (chart)</td><td>99,281 (meter)</td></tr>
+<tr><td>Untraced credits</td><td>54,631</td><td>55,634</td></tr>
+</tbody></table></div>
+<p class="note">Neither audit can show segment by day from Apollo's side. The segment view is only as good as the keyword match on each ledger row, and that match is ours. Nothing here is extrapolated.</p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,450 @@
+<title>Apollo Credit Trail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a ledger read top to bottom. Verdict first, then the day-by-day chart, then what each batch bought and where it lives now, then the cross-check against Apollo's own page. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #fcfcfb;
+  --ink: #0f1a24;
+  --ink-2: #4a5662;
+  --ink-3: #7a8591;
+  --rule: #dde2e7;
+  --rule-2: #c9d0d7;
+  --flag: #b4440f;
+  --flag-bg: #fbeee6;
+  --ok: #1d6b45;
+  --ok-bg: #e5f3ec;
+  --lost: #a1262a;
+  --lost-bg: #f9e8e8;
+  --part: #8a5a00;
+  --part-bg: #f8efd9;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #9a9a95;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111314; --surface: #1a1a19; --ink: #eef1f4; --ink-2: #b7c0c9; --ink-3: #8a959f;
+    --rule: #2a2e31; --rule-2: #3a4044;
+    --flag: #f0905c; --flag-bg: #2e1d13; --ok: #6fd1a0; --ok-bg: #12261c;
+    --lost: #f08a8d; --lost-bg: #2d1516; --part: #e3b95a; --part-bg: #2a2110;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #6f6f6a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111314; --surface: #1a1a19; --ink: #eef1f4; --ink-2: #b7c0c9; --ink-3: #8a959f;
+  --rule: #2a2e31; --rule-2: #3a4044;
+  --flag: #f0905c; --flag-bg: #2e1d13; --ok: #6fd1a0; --ok-bg: #12261c;
+  --lost: #f08a8d; --lost-bg: #2d1516; --part: #e3b95a; --part-bg: #2a2110;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #6f6f6a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: flex; flex-direction: column; gap: 32px; }
+h1 { font-size: clamp(26px, 4vw, 34px); line-height: 1.1; margin: 0; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 18px; margin: 0 0 4px; font-weight: 600; text-wrap: balance; }
+p { margin: 0; }
+.sub { color: var(--ink-2); max-width: 70ch; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; min-width: 0; }
+
+/* verdict */
+.verdict { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.stat { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+.stat .v { font-family: var(--font-mono); font-size: 24px; font-variant-numeric: tabular-nums; font-weight: 500; }
+.stat .l { font-size: 13px; color: var(--ink-2); }
+.stat.flag { border-color: var(--flag); background: var(--flag-bg); }
+.stat.flag .v { color: var(--flag); }
+.bar3 { display: flex; height: 22px; border-radius: 3px; overflow: hidden; border: 1px solid var(--rule-2); }
+.bar3 > div { height: 100%; }
+.b-m { background: var(--ink); }
+.b-e { background: repeating-linear-gradient(135deg, var(--ink-2) 0 4px, var(--surface) 4px 7px); }
+.b-u { background: transparent; border-left: 2px dashed var(--flag); }
+.bar3-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+.bar3-key span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border: 1px solid var(--rule-2); vertical-align: -1px; }
+.k-m::before { background: var(--ink); } .k-e::before { background: repeating-linear-gradient(135deg, var(--ink-2) 0 2px, var(--surface) 2px 4px); }
+.k-u::before { border: 1px dashed var(--flag) !important; }
+.callout { border-left: 3px solid var(--flag); background: var(--flag-bg); padding: 10px 14px; border-radius: 0 6px 6px 0; color: var(--ink); }
+.callout b { font-weight: 600; }
+
+/* chart */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); }
+.legend .it { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+.chart-box { position: relative; overflow-x: auto; }
+svg.chart { width: 100%; min-width: 560px; height: auto; display: block; }
+svg.chart text { font-family: var(--font-mono); fill: var(--ink-2); font-size: 11px; }
+svg.chart .grid { stroke: var(--rule); stroke-width: 1; }
+svg.chart .axis { stroke: var(--rule-2); stroke-width: 1; }
+svg.chart .tot { fill: var(--ink); font-size: 12px; font-weight: 500; }
+svg.chart .seg { stroke: var(--surface); stroke-width: 2; cursor: pointer; }
+svg.chart .seg:hover, svg.chart .seg:focus { stroke: var(--ink); outline: none; }
+svg.chart .dlabel { font-size: 10.5px; pointer-events: none; }
+.tip { position: absolute; z-index: 5; pointer-events: none; background: var(--ink); color: var(--bg); padding: 8px 10px; border-radius: 5px; font-size: 12.5px; max-width: 280px; line-height: 1.4; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.tip b { font-weight: 600; }
+.tip .num { font-size: 12px; }
+
+/* categories */
+.cats { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+.cat { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(0, 1.5fr) minmax(0, 2fr); gap: 12px 20px; padding: 16px; border-top: 1px solid var(--rule); }
+.cat:first-child { border-top: 0; }
+.cat .name { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cat .name .t { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.cat .name .sw { width: 12px; height: 12px; border-radius: 2px; flex: none; }
+.cat .big { font-family: var(--font-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
+.cat .mini { height: 8px; background: var(--rule); border-radius: 2px; overflow: hidden; display: flex; }
+.cat .mini i { display: block; height: 100%; }
+.cat .mini .em { opacity: 1; }
+.cat .mini .ee { background-image: repeating-linear-gradient(135deg, transparent 0 2px, var(--surface) 2px 4px); }
+.cat .split { font-size: 12.5px; color: var(--ink-2); font-family: var(--font-mono); }
+.cat .what { color: var(--ink); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cat .where { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 13.5px; }
+.chip { align-self: flex-start; display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; font-weight: 500; padding: 2px 9px; border-radius: 99px; border: 1px solid currentColor; }
+.chip.ok { color: var(--ok); background: var(--ok-bg); }
+.chip.part { color: var(--part); background: var(--part-bg); }
+.chip.no { color: var(--ink-2); background: var(--bg); }
+.chip.lost { color: var(--lost); background: var(--lost-bg); }
+.path { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
+.small { font-size: 13px; color: var(--ink-2); }
+
+/* days */
+.days { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+.day { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 8px 20px; padding: 14px 16px; border-top: 1px solid var(--rule); }
+.day:first-child { border-top: 0; }
+.day .d { display: flex; flex-direction: column; }
+.day .d b { font-weight: 600; }
+.day .d .num { font-size: 20px; }
+.day .d .e { font-size: 12px; color: var(--ink-3); font-family: var(--font-mono); }
+.day ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.day li::marker { color: var(--ink-3); }
+
+/* tables */
+.tbl { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { padding: 8px 12px; text-align: left; border-top: 1px solid var(--rule); white-space: nowrap; }
+thead th { border-top: 0; position: sticky; top: 0; background: var(--surface); font-weight: 500; color: var(--ink-2); font-size: 12.5px; }
+td.r, th.r { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+tfoot td { font-weight: 600; background: var(--bg); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.foot { color: var(--ink-3); font-size: 12.5px; }
+
+@media (max-width: 820px) {
+  .verdict { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cat { grid-template-columns: minmax(0, 1fr); }
+  .day { grid-template-columns: minmax(0, 1fr); }
+  .two { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">29 Sep 10:35 IST to 4 Oct 00:36 IST &middot; companyOps, RapidActionTeam, hubspot</span>
+    <h1>Apollo credit trail</h1>
+    <p class="callout" style="margin-top:2px"><b>Partly superseded.</b> Days on this page are IST and the numbers are the first-pass audit. The reconciliation page uses Apollo's own day boundary (US Pacific fits best), the revised hubspot figures and the whole 21 Sep to 4 Oct cycle. The "what each batch bought and where it is now" cards below still apply.</p>
+    <p class="sub">Every credit that can be traced to a script run in the three repos, placed on the day it was spent, with what it bought and where that data lives today. Built from the three audit ledgers in <span class="path">docs/audit/apollo/</span>.</p>
+  </header>
+
+  <section aria-labelledby="h-verdict">
+    <h2 id="h-verdict" class="sr" style="position:absolute;left:-9999px">Summary</h2>
+    <div class="verdict">
+      <div class="stat"><span class="v">42,637</span><span class="l">credits used in this window</span></div>
+      <div class="stat"><span class="v">19,378</span><span class="l">traced to a repo, run and purpose (45%)</span></div>
+      <div class="stat flag"><span class="v">23,259</span><span class="l">not traced to any code here (55%)</span></div>
+      <div class="stat"><span class="v">7,842</span><span class="l">left at 00:36 IST on 4 Oct</span></div>
+    </div>
+    <div class="panel">
+      <div class="bar3" role="img" aria-label="Of 42,637 credits: 13,852 measured, 5,526 estimated, 23,259 untraced">
+        <div class="b-m" style="width:32.49%"></div>
+        <div class="b-e" style="width:12.96%"></div>
+        <div class="b-u" style="width:54.55%"></div>
+      </div>
+      <div class="bar3-key">
+        <span class="k-m"><b class="num">13,852</b> measured (a ledger row or log shows the call)</span>
+        <span class="k-e"><b class="num">5,526</b> estimated (reconstructed from logs, chats or code)</span>
+        <span class="k-u"><b class="num">23,259</b> untraced</span>
+      </div>
+    </div>
+    <p class="callout"><b>The untraced 23,259 all fall before 3 Oct 22:34 IST.</b> After that point the repos explain the spend to within about 140 credits. No call site in any of the three repos accounts for the earlier gap, so it points to use outside these scripts (the Apollo web app, exports, other people on the account, or another API key). Apollo's usage page by member and by API key is where it will show.</p>
+  </section>
+
+  <section aria-labelledby="h-chart">
+    <div>
+      <h2 id="h-chart">What was spent each day, by what it bought</h2>
+      <p class="sub">Traced credits only. Days use IST. Hover or focus a block for the detail.</p>
+    </div>
+    <div class="panel">
+      <div class="legend" id="legend"></div>
+      <div class="chart-box" id="chartbox">
+        <svg class="chart" id="chart" viewBox="0 0 760 380" role="img" aria-label="Stacked columns of traced Apollo credits per day by category"></svg>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <p class="foot" style="margin-top:8px">The table view of the same numbers is under "Cross-check with Apollo". Untraced credits cannot be placed on a day, so they are not drawn here.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-cats">
+    <div>
+      <h2 id="h-cats">What each batch bought, and where the data is now</h2>
+      <p class="sub">Largest first. "In HubSpot" means deals were created; the Apollo response itself was almost never stored, only what the scripts wrote out.</p>
+    </div>
+    <div class="cats" id="cats"></div>
+  </section>
+
+  <section aria-labelledby="h-days">
+    <div>
+      <h2 id="h-days">Day by day: what ran</h2>
+    </div>
+    <div class="days" id="days"></div>
+  </section>
+
+  <section aria-labelledby="h-lost" class="two">
+    <div class="panel" style="display:flex;flex-direction:column;gap:10px">
+      <h2 id="h-lost">Spent, but nothing was kept</h2>
+      <p class="small">About 1,100 credits (roughly 8% of the hubspot repo's spend) bought data that no longer exists.</p>
+      <ul class="list">
+        <li><b class="num">~328</b> first itsvc discovery run and smoke tests: the database was deleted.</li>
+        <li><b class="num">~255</b> CEO sheet: a dry run plus a live run killed before the single end-of-run sheet write, then paid again for the same 48 people.</li>
+        <li><b class="num">~230</b> COBOL batch3 first launch and batch8 workers 2 to 6: discarded or never written.</li>
+        <li><b class="num">~44</b> Anthropic roster: the "dry-run" still paid for the same 44 names as the live run.</li>
+        <li><b class="num">~137</b> the reveal kept running about 7.7 minutes after the last contact was found.</li>
+        <li><b class="num">~10</b> a crashed fix-or-remove script.</li>
+      </ul>
+    </div>
+    <div class="panel" style="display:flex;flex-direction:column;gap:10px">
+      <h2>Things to know before the next run</h2>
+      <ul class="list">
+        <li><b>Apollo is on again in companyOps.</b> It was switched off on 29 Sep at 17:35 and back on at 11:03 on 30 Sep. The repo copy reads <span class="path">vendors_disabled: []</span>. Two scripts, <span class="path">repair.py</span> and <span class="path">backfill_linkedin.py</span>, ignore that switch.</li>
+        <li><b>The 750/day guide was overridden.</b> 29 Sep ended at 3,911 for companyOps alone, using <span class="path">--apollo-budget</span> values up to 10,000.</li>
+        <li><b>Organisation search is not free.</b> <span class="path">mixed_companies/search</span> bills 1 credit per call that returns a result. The 3 Oct discovery assumed it was free; the cost (about 3,200, range 2,400 to 4,200) is an estimate.</li>
+        <li><b>A failed phone reveal still costs 8 credits.</b> In one RapidActionTeam wave, 16 were billed and 2 returned a number.</li>
+        <li>No Apollo call was made after 00:36 IST on 4 Oct, and none was made by this audit.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-x">
+    <div>
+      <h2 id="h-x">Cross-check with Apollo</h2>
+      <p class="sub">Compare each row with the matching day on Apollo's usage page. If Apollo buckets by UTC, the 3 and 4 Oct rows move: the hubspot repo's total would read 6,312 on 3 Oct and 0 on 4 Oct.</p>
+    </div>
+    <div class="tbl">
+      <table id="xtbl">
+        <thead><tr><th>Day (IST)</th><th class="r">companyOps</th><th class="r">hubspot repo</th><th class="r">RapidActionTeam</th><th class="r">Traced total</th><th class="r">of which estimated</th></tr></thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+    <div class="two">
+      <div class="panel" style="display:flex;flex-direction:column;gap:8px">
+        <h2>Expected on Apollo's page</h2>
+        <ul class="list">
+          <li><b>29 Sep:</b> companyOps alone should show about 2,343 under exports/enrichment and 1,568 under mobile (196 reveals at 8 credits). The split is the audit's assumption, not yet confirmed.</li>
+          <li><b>Mobile:</b> your 35,464 figure equals 4,433 reveals at 8 credits. The repos explain about 8,580 of the 20,152 mobile credits used since 29 Sep, leaving about 11,570 (roughly 1,450 reveals).</li>
+          <li><b>Everything else:</b> about 19,400 used, about 7,700 explained, about 11,700 not.</li>
+        </ul>
+      </div>
+      <div class="panel" style="display:flex;flex-direction:column;gap:8px">
+        <h2>What to ask Apollo for</h2>
+        <ul class="list">
+          <li>Usage by team member and by API key, 29 Sep to 4 Oct, split by action (enrich, mobile reveal, export, organisation search).</li>
+          <li><b>28 Sep 09:10 to 29 Sep 10:34:</b> the balance fell from 11,101 to 479. RapidActionTeam's 14 enrichment waves explain 941; 6,965 fell overnight when no script ran.</li>
+          <li>RapidActionTeam's <span class="path">.env</span> changed on 29 Sep at 12:51. If the Apollo key was rotated then, per-key usage separates old from new.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot">Window balance: 479 left at 29 Sep 10:34:50, plus the 50,000 top-up, minus 7,842 left at 4 Oct 00:36:27 gives 42,637 used. Your 7,800 figure is that reading rounded. Measured and estimated tags come from each repo's audit. The companyOps total rests on its own cost ledger, which charges every successful response and every reveal, so it may overstate if Apollo bills only on success.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  var CATS = [
+    { k: 'itsvc IT services', c: '--s1', total: 6232, est: 3325 },
+    { k: 'COBOL India', c: '--s2', total: 5024, est: 1845 },
+    { k: 'EdTech', c: '--s3', total: 2129, est: 0 },
+    { k: 'Fintech', c: '--s4', total: 1900, est: 0 },
+    { k: 'UK Proptech', c: '--s5', total: 1341, est: 15 },
+    { k: 'Sheets & rosters', c: '--s6', total: 1300, est: 296 },
+    { k: 'Healthcare & Medtech', c: '--s7', total: 1075, est: 0 },
+    { k: 'Other', c: '--s8', total: 377, est: 45 }
+  ];
+  var DAYS = [
+    { id: '29 Sep', dow: 'Tue', v: { 'Fintech': 1900, 'EdTech': 1424, 'Healthcare & Medtech': 508, 'Sheets & rosters': 204, 'Other': 103 }, co: 3924, hs: 215, rat: 0, est: 26 },
+    { id: '30 Sep', dow: 'Wed', v: { 'COBOL India': 864, 'EdTech': 705, 'UK Proptech': 1341, 'Sheets & rosters': 955, 'Healthcare & Medtech': 567, 'Other': 208 }, co: 2344, hs: 2296, rat: 0, est: 298 },
+    { id: '1 Oct', dow: 'Thu', v: { 'COBOL India': 4160, 'Sheets & rosters': 57, 'Other': 18 }, co: 0, hs: 4234, rat: 1, est: 1865 },
+    { id: '2 Oct', dow: 'Fri', v: { 'Sheets & rosters': 34 }, co: 0, hs: 34, rat: 0, est: 0 },
+    { id: '3 Oct', dow: 'Sat', v: { 'itsvc IT services': 4739, 'Sheets & rosters': 50, 'Other': 48 }, co: 18, hs: 4819, rat: 0, est: 3200 },
+    { id: '4 Oct', dow: 'Sun', v: { 'itsvc IT services': 1493 }, co: 0, hs: 1493, rat: 0, est: 137 }
+  ];
+  var WHAT = {
+    '29 Sep': ['companyOps TAM outreach for Fintech, EdTech and Healthcare: headcount checks, LinkedIn and email matches, direct-dial mobile reveals (3,832 credits).',
+      'Apollo answered "insufficient credits" from 12:19 to 12:34 IST; the top-up appears to land around 12:38.',
+      'Wrong-number repair, 8 contacts corrected (77). Anthropic roster (104) and the telehealth India sheet (100) from the hubspot repo. Small probes and tests.'],
+    '30 Sep': ['UK Proptech build: 50 CEO-tier contacts with UK mobiles pushed as deals to Yuktha, then wrong-tier contacts replaced on 18 deals (1,341).',
+      'COBOL-India company POC for Ishpreet Sood from companyOps: 167 rows, 91 found, 57 callable (864).',
+      'companyOps pushes continued: EdTech 705, Healthcare 567, E-commerce 207.',
+      'CEO leads sheet 605 (220 of it lost when the first run was killed), NVIDIA and Tencent/ByteDance rosters 350.'],
+    '1 Oct': ['India COBOL-IP TAM from the hubspot repo: organisation discovery, then batch after batch of owner enrichment (4,160, of which about 1,845 is reconstructed because logs were overwritten or processes killed).',
+      'Amazon and NVIDIA roster tabs (57). One RapidActionTeam email lookup (1).'],
+    '2 Oct': ['OpenAI roster tab (34). Nothing else.'],
+    '3 Oct': ['itsvc: discovery of the Indian IT-services universe by organisation search, 61,799 companies (3,188, estimated). The script assumed this was free; Apollo bills 1 credit per call, found out at 22:34 IST.',
+      'itsvc 250-contact reveal, first half (1,551). xAI roster tab (50). Billing tests (48).'],
+    '4 Oct': ['itsvc reveal, second half, ending at 00:36 IST (1,356), plus about 7.7 minutes of misses after the 249th contact (137).',
+      'Nothing after 00:36 IST: the session was told not to use Apollo.']
+  };
+  var WHERE = [
+    { k: 'itsvc IT services', t: 'itsvc-tam database and POC list',
+      what: '61,799 Indian IT-services companies found through organisation search (3,188, estimated), and a reveal of 250 CEO, founder, MD and CTO contacts that yielded 249 with +91 mobiles (3,044, about 12 credits per contact).',
+      chip: ['no', 'Not in HubSpot'],
+      where: [['Companies', 'legacy/hubspot/itsvc-tam/itsvc.db, also loaded into db/leadgen.sqlite as legacy_itsvc_* (61,799 rows).'],
+              ['Contacts', 'legacy/hubspot/itsvc-tam/out/poc_callable_250.csv (249 rows). Not imported to the database.'],
+              ['Lost', 'The first discovery run (about 328 credits): its database was deleted.']] },
+    { k: 'COBOL India', t: 'COBOL codebase owners (India)',
+      what: 'hubspot repo, 1 Oct (4,160): 46 deals created in HubSpot at about 90 credits each, the rest as enriched CSV leads. companyOps, 30 Sep (864): 167 rows, 91 contacts found, 57 callable.',
+      chip: ['part', 'Partly in HubSpot'],
+      where: [['HubSpot', '46 deals from the hubspot-repo run.'],
+              ['CSV', 'legacy/RapidActionTeam/india_cobol_ip_*_enriched_2026-10-01.csv and legacy/hubspot/india_cobol_*_enriched.csv.'],
+              ['companyOps run', 'legacy/companyOps/exports/cobol_sub499_poc.csv (167 rows) and cobol_sub499_poc_callable.csv (57 rows, emailed to Ishpreet Sood). Not in HubSpot.']] },
+    { k: 'EdTech', t: 'EdTech TAM push (Cluster 1)',
+      what: '119 deals pushed with decision-maker, LinkedIn URL and +91 mobile after the headcount gate (50 to 1,000).',
+      chip: ['ok', 'In HubSpot'],
+      where: [['HubSpot', 'Portal 246897735, Cluster 1 (pipeline default). Reps Amisha and Manit.'],
+              ['Record', 'crm_pushes in tam.sqlite3, loaded as legacy_tam_crm_pushes. Headcount in companies.employee_count.']] },
+    { k: 'Fintech', t: 'Fintech TAM push (Cluster 2)',
+      what: '135 deals pushed through the same gates.',
+      chip: ['ok', 'In HubSpot'],
+      where: [['HubSpot', 'Portal 246897735, Cluster 2 (pipeline 2464812771). Reps Vaishnavi and Tanisha.'],
+              ['Record', 'crm_pushes in tam.sqlite3 and legacy_tam_crm_pushes.']] },
+    { k: 'UK Proptech', t: 'UK Proptech batch',
+      what: '50 CEO-tier contacts with UK mobiles pushed as deals (990), then wrong-tier contacts (HR, sales) replaced on 18 deals (about 350).',
+      chip: ['ok', 'In HubSpot'],
+      where: [['HubSpot', 'Portal 246754894, CoOps (Global) pipeline 2425754306, lead source UK_Proptech, owner Yuktha. Two later archived.'],
+              ['Log', 'legacy/hubspot/poc_correction_2026-09-30.csv (42 rows).']] },
+    { k: 'Sheets & rosters', t: 'Google Sheets and reference rosters',
+      what: 'CEO leads (48 proptech and fintech CEOs, 34 emails, 32 phones), the telehealth India BD sheet (35 companies), and reference rosters for NVIDIA, Amazon, OpenAI, xAI, Anthropic and Tencent/ByteDance staff.',
+      chip: ['no', 'Sheets and CSV only'],
+      where: [['Sheets', 'Written back into the source Google Sheets: CEO leads tab "Leads", telehealth tab "India", reference sheet tabs NVIDIA, xAI, OpenAI, Amazon.'],
+              ['CSV', 'legacy/hubspot/ceo_leads_enriched_2026-09-30.csv (46 rows), telehealth_india_enriched_2026-09-29.csv (35 rows).'],
+              ['Lost', 'About 220 credits of the first CEO run, killed before the sheet write.']] },
+    { k: 'Healthcare & Medtech', t: 'Healthcare and Medtech TAM push (Cluster 1)',
+      what: '93 deals pushed.',
+      chip: ['ok', 'In HubSpot'],
+      where: [['HubSpot', 'Portal 246897735, Cluster 1 (pipeline default).'],
+              ['Record', 'crm_pushes in tam.sqlite3 and legacy_tam_crm_pushes.']] },
+    { k: 'Other', t: 'E-commerce push, repairs, probes',
+      what: 'E-commerce push, 11 deals (207). Wrong-number repair, 8 contacts corrected (77). The rest are credit probes, billing tests and one-off lookups (about 93).',
+      chip: ['part', 'Mostly kept'],
+      where: [['HubSpot', 'E-commerce deals in Cluster 1; corrected contacts updated in place.'],
+              ['Not kept', 'Probes and tests: nothing stored.']] }
+  ];
+
+  var cssv = function (n) { return 'var(' + n + ')'; };
+  var fmt = function (n) { return n.toLocaleString('en-US'); };
+  var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var NS = 'http://www.w3.org/2000/svg';
+
+  // legend
+  var leg = document.getElementById('legend');
+  CATS.forEach(function (c) {
+    var d = document.createElement('span'); d.className = 'it';
+    d.innerHTML = '<i class="sw" style="background:' + cssv(c.c) + '"></i>' + esc(c.k) + ' <span class="num">' + fmt(c.total) + '</span>';
+    leg.appendChild(d);
+  });
+
+  // chart
+  var svg = document.getElementById('chart');
+  var W = 760, H = 380, L = 54, R = 12, T = 28, B = 44, YMAX = 5000;
+  var iw = W - L - R, ih = H - T - B, band = iw / DAYS.length, bw = Math.min(70, band * 0.62);
+  var y = function (v) { return T + ih - (v / YMAX) * ih; };
+  function el(n, a, txt) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; return e; }
+  for (var t = 0; t <= YMAX; t += 1000) {
+    svg.appendChild(el('line', { x1: L, x2: W - R, y1: y(t), y2: y(t), class: t === 0 ? 'axis' : 'grid' }));
+    svg.appendChild(el('text', { x: L - 8, y: y(t) + 4, 'text-anchor': 'end' }, fmt(t)));
+  }
+  svg.appendChild(el('text', { x: L, y: 14 }, 'credits per day'));
+  // text colour on fills: dark ink on light fills
+  var DARKTXT = { '--s3': 1, '--s4': 1, '--s5': 1 };
+  var tip = document.getElementById('tip'), box = document.getElementById('chartbox');
+  function showTip(ev, html) {
+    tip.innerHTML = html; tip.hidden = false;
+    var r = box.getBoundingClientRect();
+    var px = (ev.clientX != null ? ev.clientX : r.left + 40) - r.left + box.scrollLeft;
+    var py = (ev.clientY != null ? ev.clientY : r.top + 40) - r.top;
+    tip.style.left = Math.min(Math.max(px + 12, 4), Math.max(r.width - 290, 4)) + 'px';
+    tip.style.top = Math.max(py - 8, 0) + 'px';
+  }
+  function hideTip() { tip.hidden = true; }
+  DAYS.forEach(function (d, i) {
+    var cx = L + band * i + band / 2, x0 = cx - bw / 2, acc = 0, total = 0;
+    CATS.forEach(function (c) {
+      var v = d.v[c.k]; if (!v) return;
+      var y1 = y(acc + v), y0 = y(acc), h = y0 - y1;
+      var r = el('rect', { x: x0, y: y1, width: bw, height: h, fill: cssv(c.c), class: 'seg', tabindex: 0, role: 'img',
+        'aria-label': d.dow + ' ' + d.id + ', ' + c.k + ', ' + fmt(v) + ' credits' });
+      var html = '<b>' + d.dow + ' ' + d.id + '</b><br>' + esc(c.k) + '<br><span class="num">' + fmt(v) + ' credits</span>';
+      r.addEventListener('mousemove', function (ev) { showTip(ev, html); });
+      r.addEventListener('mouseleave', hideTip);
+      r.addEventListener('focus', function () { var b = r.getBoundingClientRect(); showTip({ clientX: b.right, clientY: b.top }, html); });
+      r.addEventListener('blur', hideTip);
+      svg.appendChild(r);
+      if (h >= 17) {
+        var lab = el('text', { x: cx, y: y1 + h / 2 + 4, 'text-anchor': 'middle', class: 'dlabel' }, fmt(v));
+        lab.style.fill = DARKTXT[c.c] ? '#0b0b0b' : '#ffffff';
+        svg.appendChild(lab);
+      }
+      acc += v; total += v;
+    });
+    svg.appendChild(el('text', { x: cx, y: y(total) - 7, 'text-anchor': 'middle', class: 'tot' }, fmt(total)));
+    svg.appendChild(el('text', { x: cx, y: H - B + 18, 'text-anchor': 'middle' }, d.dow + ' ' + d.id));
+  });
+
+  // categories
+  var host = document.getElementById('cats');
+  var colorOf = {}; CATS.forEach(function (c) { colorOf[c.k] = c; });
+  WHERE.forEach(function (w) {
+    var c = colorOf[w.k], meas = c.total - c.est;
+    var row = document.createElement('div'); row.className = 'cat';
+    row.innerHTML =
+      '<div class="name"><span class="t"><i class="sw" style="background:' + cssv(c.c) + '"></i>' + esc(w.t) + '</span>' +
+      '<span class="big">' + fmt(c.total) + '</span>' +
+      '<div class="mini" role="img" aria-label="' + fmt(meas) + ' measured, ' + fmt(c.est) + ' estimated"><i class="em" style="width:' + (meas / c.total * 100) + '%;background:' + cssv(c.c) + '"></i><i class="ee" style="width:' + (c.est / c.total * 100) + '%;background-color:' + cssv(c.c) + '"></i></div>' +
+      '<span class="split">' + fmt(meas) + ' measured &middot; ' + fmt(c.est) + ' estimated</span></div>' +
+      '<div class="what"><span>' + esc(w.what) + '</span></div>' +
+      '<div class="where"><span class="chip ' + w.chip[0] + '">' + esc(w.chip[1]) + '</span>' +
+      w.where.map(function (p) { return '<div><span class="small"><b>' + esc(p[0]) + '.</b></span> <span class="path">' + esc(p[1]) + '</span></div>'; }).join('') + '</div>';
+    host.appendChild(row);
+  });
+
+  // days
+  var dh = document.getElementById('days');
+  DAYS.forEach(function (d) {
+    var tot = Object.keys(d.v).reduce(function (a, k) { return a + d.v[k]; }, 0);
+    var r = document.createElement('div'); r.className = 'day';
+    r.innerHTML = '<div class="d"><b>' + d.dow + ' ' + d.id + '</b><span class="num">' + fmt(tot) + '</span><span class="e">' + fmt(d.est) + ' estimated</span></div>' +
+      '<ul>' + WHAT[d.id].map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>';
+    dh.appendChild(r);
+  });
+
+  // cross-check table
+  var tb = document.querySelector('#xtbl tbody'), tf = document.querySelector('#xtbl tfoot');
+  var sums = [0, 0, 0, 0, 0];
+  DAYS.forEach(function (d) {
+    var tot = d.co + d.hs + d.rat; sums[0] += d.co; sums[1] += d.hs; sums[2] += d.rat; sums[3] += tot; sums[4] += d.est;
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + d.dow + ' ' + d.id + '</td><td class="r">' + fmt(d.co) + '</td><td class="r">' + fmt(d.hs) + '</td><td class="r">' + fmt(d.rat) + '</td><td class="r"><b>' + fmt(tot) + '</b></td><td class="r">' + fmt(d.est) + '</td>';
+    tb.appendChild(tr);
+  });
+  tf.innerHTML = '<tr><td>Total</td>' + sums.map(function (s) { return '<td class="r">' + fmt(s) + '</td>'; }).join('') + '</tr>';
+})();
+</script>

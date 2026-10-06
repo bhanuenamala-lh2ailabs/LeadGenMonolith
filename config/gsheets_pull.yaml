@@ -1,0 +1,13 @@
+# Google Sheets pull allow-list.  DATA, not code.
+#
+# Sheets are OPT-IN: ext_gsheet_catalog.pull_enabled defaults to 0 because 1,529 of the 1,570 sheets our credentials can see belong to
+# other people (some hold personal data).  The catalog importer sets pull_enabled = 1 ONLY for the spreadsheet ids listed here, and
+# never for an id in the ext_gsheet_exclusion table (the applicant-PII intern sheet), whatever this file says: the database forces
+# pii_class = 'excluded', pull_enabled = 0 for those ids.
+#
+# Fill in ids deliberately (docs/discovery/google-integrations.md lists the sheets the old repos actually used).  Reads only; nothing
+# is ever written back to Google.
+version: 1
+spreadsheets: []
+#  - id: "<spreadsheet id>"
+#    note: "why this sheet is pulled"

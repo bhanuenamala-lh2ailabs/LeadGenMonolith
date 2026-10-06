@@ -1,0 +1,37 @@
+# secrets & credentials
+.env
+.env.*
+!.env.example
+secrets/
+**/*token*.json
+**/client_secret*.json
+**/*service_account*.json
+legacy/**/.env
+# heavy / regenerable
+.venv/
+venv/
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+# data & database (real business data / PII)
+db/*.sqlite
+db/*.sqlite-*
+data/
+legacy/
+archive/
+chat_context/
+*.csv
+*.xlsx
+db/_scratch/
+.pytest_cache/
+
+# migration backups (VACUUM INTO copies written before a migration touches a non-empty database)
+db/backup/
+db/backup/
+
+# run outputs and local state (contain people, company lists, personal social links)
+out/
+reports/
+.claude/
+docs/audit/apollo/apollo_docs_snapshot/

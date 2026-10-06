@@ -1,0 +1,2 @@
+# migrations are hashed byte-for-byte (schema_migration.checksum_sha256): never let git change their line endings
+db/migrations/*.sql text eol=lf

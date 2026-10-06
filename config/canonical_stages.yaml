@@ -1,0 +1,298 @@
+# Canonical funnel ladder: the one vocabulary every funnel is mapped onto.  DATA, not code.
+#
+# Derived from docs/discovery/funnel-reports.md section 4.2 (ladder) and the "Canonical dead
+# taxonomy" table.  Native stages (account, pipeline, stage_id) are mapped onto these codes by
+# the stage_map table (config/stage_map.yaml, authored separately); nothing here is portal-specific.
+#
+#   depth        monotone numeric depth.  Used for "how far did this deal get".  Dead stages inherit
+#                the depth reached (stage_map.depth_reached), they do not have a rung of their own.
+#   rank         the label used in the spec (0, 0b, 1, 1b, 2 ... 13).  `X` = dead branch.
+#   is_live      a deal sitting here is still being worked.
+#   is_dead      terminal loss; the specific cause is a dead reason (second list below).
+#   is_won       the single won rung (Closed/Won only; contract signed and payment are separate rungs).
+#   is_derived   no native stage in any portal maps here; the rung is computed from event history
+#                (e.g. "meeting held" = reached a later rung without a no-show/cancel).
+#   is_entry     first-entry rungs.  Entries into these count from ANY source (a script push IS the
+#                "entered the funnel" event), every other rung is reported Human / Automated / Total.
+#   flags        effort flags a FIRST ENTRY into the rung satisfies (non-cascading in the KPI sense,
+#                but nested here: interested implies connected implies attempted):
+#                  attempt    = a dial / outreach attempt happened
+#                  connected  = a human at the prospect responded or declined live
+#                  interested = the prospect showed interest
+#
+# This file is mirrored into canonical_stage / canonical_dead_reason by
+# leadgen.db.seed_reference_data() and by the seed INSERTs in db/migrations/0002_canonical.sql;
+# tests/test_schema.py fails if the two drift apart.  Changing a code or a flag is a schema-level
+# decision: add a new migration that updates the seed rows, never edit an applied migration.
+
+version: 1
+
+stages:
+  - code: SOURCED
+    rank: "0"
+    depth: 0
+    label: Sourced / Assigned
+    definition: Lead assigned to a caller and entered the funnel (Cold Call, Cold Lead, Cold called assigned). Any source counts; this is the new-lead entry row.
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: true
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: LI_SENT
+    rank: "0b"
+    depth: 0.5
+    label: "Outreach sent: LinkedIn"
+    definition: LinkedIn connection request sent (channel entry, automation-dominated via OutFlo). Not a row in the legacy Cluster report; shown in its own Human / Automated sub-section.
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: true
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: NO_ANSWER
+    rank: "1"
+    depth: 1
+    label: "Attempted: no answer"
+    definition: A dial was attempted and nobody picked up (No Pickup, No Response, Callback, the retired "Callback +1 day"). The loop stage; a deal may re-enter it many times.
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: true, connected: false, interested: false}
+
+  - code: LI_CONNECTED
+    rank: "1b"
+    depth: 1.5
+    label: "Connected: LinkedIn"
+    definition: LinkedIn connection accepted. Counts as an attempt (outreach happened) but not as a live connect.
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: true, connected: false, interested: false}
+
+  - code: REPLIED
+    rank: "2"
+    depth: 2
+    label: Connected / Replied
+    definition: A human at the prospect answered or replied (Replied, Communicated). Coding has no such stage; a move into Interested satisfies attempted + connected + interested in one event.
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: true, connected: true, interested: false}
+
+  - code: INTERESTED
+    rank: "3"
+    depth: 3
+    label: Interested / first interest
+    definition: Prospect expressed interest (Interested, 1st interest sent, 1st interest follow up).
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: true, connected: true, interested: true}
+
+  - code: MEETING_BOOKED
+    rank: "4"
+    depth: 4
+    label: Meeting booked
+    definition: A discovery call / VC / GMeet slot was fixed or rescheduled (GMeet Fixed, VC Fixed, VC Rescheduled, Discovery call, Call rescheduled). Booked is not held.
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: true, connected: true, interested: true}
+
+  - code: MEETING_HELD
+    rank: "5"
+    depth: 5
+    label: Meeting held
+    definition: DERIVED, no native stage. A deal with a meeting-booked entry that later reached an artefact rung or a post-meeting dead reason, and never entered No-show or Cancelled. Credited to the meeting day when gmeet1_date / discovery_call_date is populated, else the booking day.
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: true
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: ASSET_REQUESTED
+    rank: "6"
+    depth: 6
+    label: Asset / sample requested
+    definition: The deliverable to evaluate was requested or sent (Script Shared, 1 Pager Shared, One pager requested / follow up, Sample Requested / Follow Up).
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: ASSET_RECEIVED
+    rank: "7"
+    depth: 7
+    label: Asset / sample received
+    definition: The prospect's output came back (Script Results Received, 1 Pager Output Received, One pager received, Sample Received).
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: EVALUATED
+    rank: "8"
+    depth: 8
+    label: Evaluated
+    definition: DERIVED, no native stage. The deal left ASSET_RECEIVED for a post-evaluation outcome (a quality dead reason, or a move to negotiation / LOI).
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: true
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: NEGOTIATION
+    rank: "9"
+    depth: 9
+    label: Negotiation / LOI
+    definition: Commercial negotiation or LOI (Commercial Negotiation, LOI, LOI Signed, Negotiation). CoOps ( Global ) Sample Extraction and Demand Fulfillment sit here as sub-rows (stage_map.sub_row).
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: CONTRACT
+    rank: "10"
+    depth: 10
+    label: Contract signed
+    definition: Contract signed (Deal Contract Signed, Contract Signed, Contract signed). Not the same as Won.
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: DELIVERED
+    rank: "11"
+    depth: 11
+    label: Delivered / handover
+    definition: Data delivered or handed over (Data Migration Done, Metadata Matched, Data Extraction Done, Ops data handover done).
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: PAYMENT
+    rank: "12"
+    depth: 12
+    label: Payment initiated
+    definition: Payment initiated (Payment Initiation). CoOps ( Global ) has no such stage.
+    is_live: true
+    is_dead: false
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: WON
+    rank: "13"
+    depth: 13
+    label: Won
+    definition: Closed/Won, and only Closed/Won (Closed / Won with spaces in RAT).
+    is_live: false
+    is_dead: false
+    is_won: true
+    is_derived: false
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+  - code: DEAD
+    rank: "X"
+    depth: 100
+    label: Dead
+    definition: Terminal loss. Every dead native stage maps here and carries a dead reason plus the depth reached before dying (stage_map.dead_reason_code, stage_map.depth_reached). A revived deal can die more than once, so count distinct deals as well as entries.
+    is_live: false
+    is_dead: true
+    is_won: false
+    is_derived: false
+    is_entry: false
+    flags: {attempt: false, connected: false, interested: false}
+
+# Canonical dead taxonomy (funnel-reports.md "Canonical dead taxonomy").  The flags say whether
+# dying for this reason still counts as an attempt (A) / a live connect (C) in the effort KPIs.
+# A stage_map row may override a flag for one native stage (e.g. CoOps "Communicated / Wrong Fit"
+# was already communicated, so it is an attempt even though WRONG_FIT normally is not).
+dead_reasons:
+  - code: WRONG_FIT
+    label: Wrong fit (screened)
+    definition: Screened out without ever being dialled.
+    flags: {attempt: false, connected: false}
+    counts_in_effort_kpis: true
+
+  - code: BAD_CONTACT
+    label: Bad contact (wrong or invalid number)
+    definition: A dial happened but the number or contact is wrong/invalid.
+    flags: {attempt: true, connected: false}
+    counts_in_effort_kpis: true
+
+  - code: NO_RESPONSE
+    label: No response / unreachable
+    definition: Never answered or replied after repeated attempts, or the requested artefact never arrived.
+    flags: {attempt: true, connected: false}
+    counts_in_effort_kpis: true
+
+  - code: NOT_INTERESTED
+    label: Not interested (declined)
+    definition: Prospect declined, at any stage up to and including discovery.
+    flags: {attempt: true, connected: true}
+    counts_in_effort_kpis: true
+
+  - code: NO_SHOW
+    label: No-show
+    definition: Booked meeting not attended by the prospect.
+    flags: {attempt: true, connected: true}
+    counts_in_effort_kpis: true
+
+  - code: MEETING_CANCELLED
+    label: Meeting cancelled before held
+    definition: Meeting cancelled; no effort spent, excluded from "meetings held".
+    flags: {attempt: true, connected: true}
+    counts_in_effort_kpis: true
+
+  - code: REJECTED_BY_LH2
+    label: Rejected by LH2 / quality fail
+    definition: LH2 rejected the lead after a meeting or after evaluating the asset (wrong fit after call, low data quality, failed extraction, requirements not met).
+    flags: {attempt: true, connected: true}
+    counts_in_effort_kpis: true
+
+  - code: PRIVACY
+    label: Privacy / compliance
+    definition: Prospect cannot proceed for privacy or compliance reasons.
+    flags: {attempt: true, connected: true}
+    counts_in_effort_kpis: true
+
+  - code: COMMERCIAL
+    label: Commercial (price or terms)
+    definition: Price or contractual terms not agreed during negotiation / LOI.
+    flags: {attempt: true, connected: true}
+    counts_in_effort_kpis: true
+
+  - code: RETIRED_ADMIN
+    label: Retired / administrative
+    definition: Not a funnel outcome (Dead - Email Campaign / Branch Retired, Dropped - Pretraining, Call Attempted (retired)). Excluded from every effort KPI and shown under "Retired".
+    flags: {attempt: false, connected: false}
+    counts_in_effort_kpis: false

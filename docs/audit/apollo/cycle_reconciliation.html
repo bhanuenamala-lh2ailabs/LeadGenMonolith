@@ -1,0 +1,262 @@
+<title>Apollo Cycle Reconciliation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: verdict first, then the day-by-day bar-versus-trace chart, then what Apollo's docs say about each kind of call, then what to ask Apollo. */
+:root {
+  --bg: #f3f5f7; --surface: #fcfcfb; --ink: #0f1a24; --ink-2: #4a5662; --ink-3: #7a8591;
+  --rule: #dde2e7; --rule-2: #c9d0d7; --flag: #b4440f; --flag-bg: #fbeee6;
+  --ok: #1d6b45; --ok-bg: #e5f3ec; --part: #8a5a00; --part-bg: #f8efd9; --bad: #a1262a; --bad-bg: #f9e8e8;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111314; --surface: #1a1a19; --ink: #eef1f4; --ink-2: #b7c0c9; --ink-3: #8a959f;
+    --rule: #2a2e31; --rule-2: #3a4044; --flag: #f0905c; --flag-bg: #2e1d13;
+    --ok: #6fd1a0; --ok-bg: #12261c; --part: #e3b95a; --part-bg: #2a2110; --bad: #f08a8d; --bad-bg: #2d1516;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111314; --surface: #1a1a19; --ink: #eef1f4; --ink-2: #b7c0c9; --ink-3: #8a959f;
+  --rule: #2a2e31; --rule-2: #3a4044; --flag: #f0905c; --flag-bg: #2e1d13;
+  --ok: #6fd1a0; --ok-bg: #12261c; --part: #e3b95a; --part-bg: #2a2110; --bad: #f08a8d; --bad-bg: #2d1516;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: flex; flex-direction: column; gap: 32px; }
+h1 { font-size: clamp(26px, 4vw, 34px); line-height: 1.1; margin: 0; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 18px; margin: 0 0 4px; font-weight: 600; text-wrap: balance; }
+p { margin: 0; } .sub { color: var(--ink-2); max-width: 72ch; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; min-width: 0; }
+.verdict { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.stat { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+.stat .v { font-family: var(--font-mono); font-size: 24px; font-variant-numeric: tabular-nums; font-weight: 500; }
+.stat .l { font-size: 13px; color: var(--ink-2); }
+.stat.flag { border-color: var(--flag); background: var(--flag-bg); } .stat.flag .v { color: var(--flag); }
+.callout { border-left: 3px solid var(--flag); background: var(--flag-bg); padding: 10px 14px; border-radius: 0 6px 6px 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
+.legend .it { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 11px; height: 11px; border-radius: 2px; display: inline-block; border: 1px solid transparent; }
+.legend .un { border: 1px dashed var(--flag); background: repeating-linear-gradient(135deg, transparent 0 2px, var(--rule-2) 2px 4px); }
+.chart-box { position: relative; overflow-x: auto; }
+svg.chart { width: 100%; min-width: 600px; height: auto; display: block; }
+svg.chart text { font-family: var(--font-mono); fill: var(--ink-2); font-size: 11px; }
+svg.chart .grid { stroke: var(--rule); stroke-width: 1; } svg.chart .axis { stroke: var(--rule-2); stroke-width: 1; }
+svg.chart .tot { fill: var(--ink); font-size: 12px; font-weight: 500; }
+svg.chart .seg { stroke: var(--surface); stroke-width: 2; cursor: pointer; }
+svg.chart .seg:hover, svg.chart .seg:focus { stroke: var(--ink); outline: none; }
+svg.chart .gap { fill: url(#hatch); stroke: var(--flag); stroke-width: 1.2; stroke-dasharray: 4 3; cursor: pointer; }
+svg.chart .dl { font-size: 10.5px; pointer-events: none; }
+.tip { position: absolute; z-index: 5; pointer-events: none; background: var(--ink); color: var(--bg); padding: 8px 10px; border-radius: 5px; font-size: 12.5px; max-width: 290px; line-height: 1.4; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.tbl { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { padding: 8px 12px; text-align: left; border-top: 1px solid var(--rule); vertical-align: top; }
+thead th { border-top: 0; background: var(--surface); font-weight: 500; color: var(--ink-2); font-size: 12.5px; white-space: nowrap; }
+td.r, th.r { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tfoot td { font-weight: 600; background: var(--bg); }
+.pill { display: inline-block; font-size: 12px; font-weight: 500; padding: 1px 8px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.cons { color: var(--bad); background: var(--bad-bg); } .pill.cond { color: var(--part); background: var(--part-bg); }
+.pill.free { color: var(--ok); background: var(--ok-bg); } .pill.sil { color: var(--ink-2); background: var(--bg); }
+.q { color: var(--ink-2); font-size: 12.5px; } .path { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.foot { color: var(--ink-3); font-size: 12.5px; }
+.bar { display: inline-block; height: 8px; border-radius: 2px; background: var(--s1); vertical-align: middle; }
+@media (max-width: 820px) { .verdict { grid-template-columns: repeat(2, minmax(0, 1fr)); } .two { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">21 Sep to 4 Oct 2026 &middot; Apollo days read as US Pacific &middot; three repos, three chats</span>
+    <h1>Apollo cycle reconciliation</h1>
+    <p class="sub">Apollo's own daily usage bars against every credit that can be traced to a script, an agent run or a balance reading in the three repos. Source: <span class="path">docs/audit/apollo/MASTER_RECONCILIATION.md</span> and <span class="path">master_ledger.csv</span> (392 events, one source per repo and period).</p>
+  </header>
+
+  <section aria-label="Summary">
+    <div class="verdict">
+      <div class="stat"><span class="v">96,439</span><span class="l">credits used this cycle (Apollo)</span></div>
+      <div class="stat"><span class="v">41,469</span><span class="l">traced to a repo, run and purpose (43%)</span></div>
+      <div class="stat flag"><span class="v">54,970</span><span class="l">not traced to any code here (57%)</span></div>
+      <div class="stat"><span class="v">51%</span><span class="l">of the traced credits are estimates, not measurements</span></div>
+    </div>
+    <p class="callout"><b>Day boundary.</b> Tested against every boundary from UTC-12 to UTC+14, only US Pacific days (UTC-7, also -6.5 to -7.5) never put more traced spend on a day than Apollo's own bar. UTC overshoots on 25 Sep by about 780 credits. This is an inference from the data; the account's timezone setting in Apollo would confirm it. It also turns the 27 Sep "nobody was working" puzzle into an 86% traced day.</p>
+  </section>
+
+  <section aria-labelledby="h-chart">
+    <div>
+      <h2 id="h-chart">Each Apollo day: what the bar is, and how much of it we can place</h2>
+      <p class="sub">Solid colour is traced spend by repo. The dashed hatched block is the rest of Apollo's bar. Hover or focus any block.</p>
+    </div>
+    <div class="panel">
+      <div class="legend">
+        <span class="it"><i class="sw" style="background:var(--s1)"></i>companyOps</span>
+        <span class="it"><i class="sw" style="background:var(--s2)"></i>hubspot repo</span>
+        <span class="it"><i class="sw" style="background:var(--s3)"></i>RapidActionTeam</span>
+        <span class="it"><i class="sw un"></i>not traced</span>
+      </div>
+      <div class="chart-box" id="chartbox">
+        <svg class="chart" id="chart" viewBox="0 0 800 400" role="img" aria-label="Per Apollo day, traced credits by repo stacked under the untraced remainder of Apollo's bar"></svg>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <p class="foot" style="margin-top:8px">Apollo bar heights are read off your screenshot (about 0.3k accuracy); the table below is the same data. 26 Sep, 2 Oct and 4 Oct have no bar.</p>
+    </div>
+    <div class="tbl">
+      <table id="dtbl">
+        <thead><tr><th>Apollo day</th><th class="r">Apollo bar</th><th class="r">companyOps</th><th class="r">hubspot repo</th><th class="r">RAT</th><th class="r">Traced</th><th class="r">Untraced</th><th>Traced share</th></tr></thead>
+        <tbody></tbody><tfoot></tfoot>
+      </table>
+    </div>
+    <ul class="list">
+      <li><b>29 and 30 Sep:</b> about 20.6k untraced, and these are the best-audited days: the companyOps ledger is complete for its own code and the hubspot repo was audited twice. More tracking would not close this gap.</li>
+      <li><b>21 and 22 Sep:</b> about 16.7k untraced. The hubspot repo made no Apollo calls on either day, and the 22 Sep bar carries the cycle's whole Waterfall (1,175) and Email (786) credits, which no script in the three repos can produce.</li>
+      <li><b>27 Sep and 3 Oct:</b> 86% and 94% traced. Where an agent ran paid enrichment without a ledger (Singapore, itsvc), the trace closes once its spend is rebuilt from the chat.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-docs">
+    <div>
+      <h2 id="h-docs">Did each kind of call consume credits? What Apollo's documentation says</h2>
+      <p class="sub">Verbatim snapshot of the public docs, fetched on 5 Oct 2026, in <span class="path">docs/audit/apollo/apollo_docs_snapshot/</span>. Apollo's help-center articles return 403 and are not used.</p>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Call</th><th>Docs</th><th>What the docs say</th><th>What the repos assumed</th></tr></thead>
+        <tbody>
+          <tr><td><span class="path">mixed_companies/search</span><br>organisation search</td><td><span class="pill cons">Consumes</span></td><td class="q">"consumes 1 Apollo credit per page". Empty pages: not stated (measured 0)</td><td>Called free in 8+ places; scripts printed "0 credits spent". Only one companyOps script ledgered it</td></tr>
+          <tr><td><span class="path">organizations/enrich</span>, <span class="path">bulk_enrich</span></td><td><span class="pill cons">Consumes</span></td><td class="q">"1 credit per organization". Unit (submitted vs found) not stated</td><td>RapidActionTeam called enrich "free"; companyOps charged per domain submitted</td></tr>
+          <tr><td><span class="path">people/match</span></td><td><span class="pill cond">Conditional</span></td><td class="q">1 credit if data is found; "If no credit-consuming data is found, the request consumes 0 credits."</td><td>companyOps ledger charged 1 per any 2xx, so it over-counts no-matches</td></tr>
+          <tr><td>Phone reveal<br><span class="path">reveal_phone_number</span></td><td><span class="pill cond">Conditional</span></td><td class="q">"plus 8 credits if a mobile phone is returned". Charged on acceptance or delivery: not stated</td><td>Measured: billed even when no number showed; some scripts add 8 per call regardless</td></tr>
+          <tr><td>Same person looked up again</td><td><span class="pill cond">Can re-bill</span></td><td class="q">"you can potentially use more credits to access the same data you already accessed"</td><td>No script cached paid lookups; restarts and dry-runs re-paid</td></tr>
+          <tr><td>Waterfall parameters</td><td><span class="pill cond">Conditional</span></td><td class="q">Per vendor lookup, typically 1 to 4 (email) and 8 to 25 (phone)</td><td>No repo sets them, yet the cycle shows 1,175 Waterfall credits</td></tr>
+          <tr><td><span class="path">reveal_personal_emails=true</span></td><td><span class="pill sil">Silent</span></td><td class="q">"potentially consumes credits"</td><td>Sent on every companyOps match, never costed</td></tr>
+          <tr><td>429 and timeout retries</td><td><span class="pill sil">Silent</span></td><td class="q">Not stated</td><td>Possible silent double billing</td></tr>
+          <tr><td><span class="path">mixed_people/api_search</span></td><td><span class="pill free">Free</span></td><td class="q">"0 credits"</td><td>Correct</td></tr>
+          <tr><td>Contacts, accounts, sequences, usage, profile</td><td><span class="pill free">Free</span></td><td class="q">"All other Apollo API endpoints do not consume credits."</td><td>Correct</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tbl">
+      <table id="ctbl">
+        <thead><tr><th>Class of traced spend (keyword-based, approximate)</th><th class="r">Credits</th><th class="r">In a ledger at run time</th><th class="r">Measured another way</th><th class="r">Estimated</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="foot">Pipeline rows that do both a match and a reveal land in the phone class. Only 5% of organisation-search credits are in any ledger (82% are estimates). A free per-request meter exists: phone-reveal results and <span class="path">bulk_match</span> responses carry a <span class="path">credits_consumed</span> field.</p>
+  </section>
+
+  <section class="two" aria-labelledby="h-ask">
+    <div class="panel" style="display:flex;flex-direction:column;gap:10px">
+      <h2 id="h-ask">Ask Apollo for</h2>
+      <ul class="list">
+        <li><b>Credit usage history by team member and by surface</b> (Settings, Billing, Credit usage and AI, History) for each Pacific day above, starting with 29 and 30 Sep, 21 and 22 Sep.</li>
+        <li><b>The account timezone</b>, to confirm the day boundary.</li>
+        <li><b>API keys:</b> created date and last used for every key. The key was swapped on 29 Sep at 12:51; six keys have existed since 18 Aug. Delete the old ones.</li>
+        <li><b>Whether Apollo keeps access logs</b> (IP addresses) for your key. Its public docs do not say.</li>
+      </ul>
+    </div>
+    <div class="panel" style="display:flex;flex-direction:column;gap:10px">
+      <h2>What the evidence leans towards</h2>
+      <ul class="list">
+        <li>Untraced spend arrives in bursts and is quiet overnight (3 credits in 11 h 43 min on 27 to 28 Sep), which fits people working the same hours.</li>
+        <li>The key never appeared in git, archives or mail, and no workflow or scheduled job calls Apollo. A leak by an outsider is the least supported explanation.</li>
+        <li>Most likely: teammates in the Apollo web app on the shared login, or scripts run elsewhere with a copy of the key. Unproven until Apollo's per-member history says so.</li>
+        <li>No script in the three repos explains the 22 Sep Waterfall and Email credits.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var DAYS = [
+    ['21 Sep', 12500, 2432, 0, 0], ['22 Sep', 6800, 9, 144, 0], ['23 Sep', 5600, 683, 1647, 0],
+    ['24 Sep', 12400, 1179, 5732, 0], ['25 Sep', 3000, 51, 1496, 0], ['26 Sep', 0, 0, 0, 0],
+    ['27 Sep', 4600, 264, 2860, 829], ['28 Sep', 9300, 4332, 1087, 959], ['29 Sep', 13800, 3522, 232, 0],
+    ['30 Sep', 14800, 1769, 2432, 0], ['1 Oct', 7100, 0, 4004, 1], ['2 Oct', 0, 0, 0, 0],
+    ['3 Oct', 6200, 18, 5787, 0], ['4 Oct', 0, 0, 0, 0]
+  ];
+  var CLASSES = [
+    ['Phone reveal (+8, conditional)', 25836, 6685, 5567, 13584],
+    ['Person match or unlock (conditional)', 4849, 3267, 1173, 409],
+    ['Org enrich or headcount (consumes)', 4051, 1643, 681, 1727],
+    ['Org search (consumes)', 3715, 198, 460, 3057],
+    ['Org search plus enrich pipelines (consume)', 3018, 120, 519, 2379]
+  ];
+  var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
+  var NS = 'http://www.w3.org/2000/svg';
+  function el(n, a, t) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (t != null) e.textContent = t; return e; }
+
+  var svg = document.getElementById('chart');
+  var W = 800, H = 400, L = 54, R = 12, T = 30, B = 46, YMAX = 16000;
+  var iw = W - L - R, ih = H - T - B, band = iw / DAYS.length, bw = Math.min(40, band * 0.64);
+  var y = function (v) { return T + ih - (v / YMAX) * ih; };
+  var defs = el('defs', {}); var pat = el('pattern', { id: 'hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  pat.appendChild(el('rect', { width: 6, height: 6, fill: 'var(--surface)' })); pat.appendChild(el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: 'var(--rule-2)', 'stroke-width': 2 }));
+  defs.appendChild(pat); svg.appendChild(defs);
+  for (var t = 0; t <= YMAX; t += 4000) {
+    svg.appendChild(el('line', { x1: L, x2: W - R, y1: y(t), y2: y(t), class: t === 0 ? 'axis' : 'grid' }));
+    svg.appendChild(el('text', { x: L - 8, y: y(t) + 4, 'text-anchor': 'end' }, fmt(t)));
+  }
+  svg.appendChild(el('text', { x: L, y: 16 }, 'credits per Apollo day'));
+  var tip = document.getElementById('tip'), box = document.getElementById('chartbox');
+  function showTip(ev, html) {
+    tip.innerHTML = html; tip.hidden = false;
+    var r = box.getBoundingClientRect();
+    var px = (ev.clientX != null ? ev.clientX : r.left + 40) - r.left + box.scrollLeft, py = (ev.clientY != null ? ev.clientY : r.top + 40) - r.top;
+    tip.style.left = Math.min(Math.max(px + 12, 4), Math.max(r.width - 300, 4)) + 'px'; tip.style.top = Math.max(py - 8, 0) + 'px';
+  }
+  var hideTip = function () { tip.hidden = true; };
+  function attach(r, html) {
+    r.addEventListener('mousemove', function (ev) { showTip(ev, html); }); r.addEventListener('mouseleave', hideTip);
+    r.addEventListener('focus', function () { var b = r.getBoundingClientRect(); showTip({ clientX: b.right, clientY: b.top }, html); }); r.addEventListener('blur', hideTip);
+  }
+  var NAMES = ['companyOps', 'hubspot repo', 'RapidActionTeam'], COLS = ['var(--s1)', 'var(--s2)', 'var(--s3)'];
+  DAYS.forEach(function (d, i) {
+    var cx = L + band * i + band / 2, x0 = cx - bw / 2, acc = 0;
+    var traced = d[2] + d[3] + d[4];
+    for (var k = 0; k < 3; k++) {
+      var v = d[2 + k]; if (!v) continue;
+      var y1 = y(acc + v), y0 = y(acc), h = y0 - y1;
+      var r = el('rect', { x: x0, y: y1, width: bw, height: h, fill: COLS[k], class: 'seg', tabindex: 0, role: 'img', 'aria-label': d[0] + ', ' + NAMES[k] + ', ' + fmt(v) + ' credits traced' });
+      attach(r, '<b>' + d[0] + '</b><br>' + NAMES[k] + '<br><span class="num">' + fmt(v) + ' credits traced</span>');
+      svg.appendChild(r);
+      if (h >= 16) { var lb = el('text', { x: cx, y: y1 + h / 2 + 4, 'text-anchor': 'middle', class: 'dl' }, fmt(v)); lb.style.fill = k === 2 ? '#0b0b0b' : '#ffffff'; svg.appendChild(lb); }
+      acc += v;
+    }
+    var gap = d[1] - traced;
+    if (gap > 0) {
+      var g = el('rect', { x: x0, y: y(d[1]), width: bw, height: Math.max(y(traced) - y(d[1]), 1), class: 'gap', tabindex: 0, role: 'img', 'aria-label': d[0] + ', not traced, ' + fmt(gap) + ' credits' });
+      attach(g, '<b>' + d[0] + '</b><br>Apollo bar <span class="num">' + fmt(d[1]) + '</span><br>Traced <span class="num">' + fmt(traced) + '</span> (' + Math.round(traced / d[1] * 100) + '%)<br>Not traced <span class="num">' + fmt(gap) + '</span>');
+      svg.appendChild(g);
+    }
+    if (d[1] > 0) svg.appendChild(el('text', { x: cx, y: y(Math.max(d[1], traced)) - 7, 'text-anchor': 'middle', class: 'tot' }, fmt(d[1])));
+    svg.appendChild(el('text', { x: cx, y: H - B + 18, 'text-anchor': 'middle' }, d[0]));
+  });
+
+  var tb = document.querySelector('#dtbl tbody'), tf = document.querySelector('#dtbl tfoot'), S = [0, 0, 0, 0, 0, 0];
+  DAYS.forEach(function (d) {
+    var traced = d[2] + d[3] + d[4], gap = d[1] - traced, pct = d[1] ? Math.round(traced / d[1] * 100) : 0;
+    S[0] += d[1]; S[1] += d[2]; S[2] += d[3]; S[3] += d[4]; S[4] += traced; S[5] += gap;
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + d[0] + '</td><td class="r">' + (d[1] ? fmt(d[1]) : '-') + '</td><td class="r">' + fmt(d[2]) + '</td><td class="r">' + fmt(d[3]) + '</td><td class="r">' + fmt(d[4]) + '</td><td class="r"><b>' + fmt(traced) + '</b></td><td class="r">' + (d[1] ? fmt(gap) : '-') + '</td><td>' + (d[1] ? '<span class="bar" style="width:' + Math.max(pct * 0.9, 2) + 'px"></span> <span class="num">' + pct + '%</span>' : '') + '</td>';
+    tb.appendChild(tr);
+  });
+  tf.innerHTML = '<tr><td>Total</td><td class="r">' + fmt(S[0]) + '</td><td class="r">' + fmt(S[1]) + '</td><td class="r">' + fmt(S[2]) + '</td><td class="r">' + fmt(S[3]) + '</td><td class="r">' + fmt(S[4]) + '</td><td class="r">' + fmt(S[5]) + '</td><td class="num">' + Math.round(S[4] / S[0] * 100) + '%</td></tr>';
+
+  var cb = document.querySelector('#ctbl tbody');
+  CLASSES.forEach(function (c) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + c[0] + '</td><td class="r">' + fmt(c[1]) + '</td><td class="r">' + fmt(c[2]) + '</td><td class="r">' + fmt(c[3]) + '</td><td class="r">' + fmt(c[4]) + '</td>';
+    cb.appendChild(tr);
+  });
+})();
+</script>

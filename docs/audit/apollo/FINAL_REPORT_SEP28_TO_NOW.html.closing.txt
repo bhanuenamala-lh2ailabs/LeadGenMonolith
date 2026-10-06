@@ -1,0 +1,9 @@
+AUDIT CLOSED 2026-10-06 (user decision)
+
+Closed with the gap recorded as unexplained, not attributed.
+
+- Traced: about 40,000 of roughly 99,000 credits (cycle to 5 Oct), tied to a repo, segment and purpose. Day totals match Apollo's chart.
+- Unexplained: about 55,000 credits, mostly phone reveals (chart about 60,000 phone credits; about 7,500 reveals at 8 credits) and exports (chart about 37,500). Not traceable from our side.
+- Open for Apollo only: per-user daily export or billing page. Not requested further.
+- Not confirmed: "Apollo out of credits". Balance read 4,999 lead credits left, earlier note 7,294.
+- Going forward: every Apollo call goes through leadgen/apollo_ledger.py (migration 0018 and 0019), with segment and outcome logged. Query with tools/apollo_audit.py.

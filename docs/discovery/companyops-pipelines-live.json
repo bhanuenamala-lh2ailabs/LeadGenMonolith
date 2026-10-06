@@ -1,0 +1,543 @@
+{
+ "portalId": 246897735,
+ "pipelines": {
+  "default": {
+   "label": "Company Ops Cluster 1 India",
+   "stages": [
+    {
+     "id": "4327110345",
+     "label": "LinkedIn sent",
+     "displayOrder": 1,
+     "probability": "0.03",
+     "isClosed": "false",
+     "deals": 0
+    },
+    {
+     "id": "4327110346",
+     "label": "Cold called assigned",
+     "displayOrder": 2,
+     "probability": "0.05",
+     "isClosed": "false",
+     "deals": 33
+    },
+    {
+     "id": "4326787818",
+     "label": "LinkedIn connected",
+     "displayOrder": 3,
+     "probability": "0.05",
+     "isClosed": "false",
+     "deals": 38
+    },
+    {
+     "id": "4326787819",
+     "label": "No pickup",
+     "displayOrder": 4,
+     "probability": "0.05",
+     "isClosed": "false",
+     "deals": 492
+    },
+    {
+     "id": "4326787820",
+     "label": "Retired: Callback +1 day (use No pickup + task instead)",
+     "displayOrder": 5,
+     "probability": "0.05",
+     "isClosed": "false",
+     "deals": 51
+    },
+    {
+     "id": "4326787821",
+     "label": "Replied",
+     "displayOrder": 6,
+     "probability": "0.12",
+     "isClosed": "false",
+     "deals": 26
+    },
+    {
+     "id": "4327110347",
+     "label": "1st interest sent",
+     "displayOrder": 7,
+     "probability": "0.2",
+     "isClosed": "false",
+     "deals": 93
+    },
+    {
+     "id": "4327110348",
+     "label": "1st interest follow up",
+     "displayOrder": 8,
+     "probability": "0.2",
+     "isClosed": "false",
+     "deals": 1
+    },
+    {
+     "id": "4327110349",
+     "label": "Discovery call",
+     "displayOrder": 9,
+     "probability": "0.35",
+     "isClosed": "false",
+     "deals": 29
+    },
+    {
+     "id": "4326787822",
+     "label": "Call rescheduled",
+     "displayOrder": 10,
+     "probability": "0.35",
+     "isClosed": "false",
+     "deals": 7
+    },
+    {
+     "id": "4327110350",
+     "label": "One pager requested",
+     "displayOrder": 11,
+     "probability": "0.45",
+     "isClosed": "false",
+     "deals": 6
+    },
+    {
+     "id": "4326787823",
+     "label": "One pager follow up",
+     "displayOrder": 12,
+     "probability": "0.45",
+     "isClosed": "false",
+     "deals": 1
+    },
+    {
+     "id": "4327110351",
+     "label": "One pager received",
+     "displayOrder": 13,
+     "probability": "0.55",
+     "isClosed": "false",
+     "deals": 0
+    },
+    {
+     "id": "4327110352",
+     "label": "LOI signed",
+     "displayOrder": 14,
+     "probability": "0.7",
+     "isClosed": "false",
+     "deals": 0
+    },
+    {
+     "id": "4327110353",
+     "label": "Contract signed",
+     "displayOrder": 15,
+     "probability": "0.85",
+     "isClosed": "false",
+     "deals": 0
+    },
+    {
+     "id": "4326787824",
+     "label": "Ops data handover done",
+     "displayOrder": 16,
+     "probability": "0.9",
+     "isClosed": "false",
+     "deals": 1
+    },
+    {
+     "id": "4327110354",
+     "label": "Payment initiation",
+     "displayOrder": 17,
+     "probability": "0.95",
+     "isClosed": "false",
+     "deals": 0
+    },
+    {
+     "id": "4326787825",
+     "label": "Closed/Won",
+     "displayOrder": 18,
+     "probability": "1.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4326787826",
+     "label": "Dead: Cold Call / Wrong Fit",
+     "displayOrder": 19,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 39
+    },
+    {
+     "id": "4326787827",
+     "label": "Dead: Cold Call / Wrong Number",
+     "displayOrder": 20,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 175
+    },
+    {
+     "id": "4326787828",
+     "label": "Dead: Cold Call / Not Interested",
+     "displayOrder": 21,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 110
+    },
+    {
+     "id": "4327110355",
+     "label": "Dead: Cold Call / No Pickup",
+     "displayOrder": 22,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 8
+    },
+    {
+     "id": "4326787829",
+     "label": "Dead: Replied / Not Interested",
+     "displayOrder": 23,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 22
+    },
+    {
+     "id": "4326787830",
+     "label": "Dead: 1st Interest / No Response",
+     "displayOrder": 24,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4327110356",
+     "label": "Dead: 1st Interest / Not Interested",
+     "displayOrder": 25,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 2
+    },
+    {
+     "id": "4327110357",
+     "label": "Dead: Discovery Call / No Show",
+     "displayOrder": 26,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4326787831",
+     "label": "Dead: Discovery Call / Rejected by LH2",
+     "displayOrder": 27,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4326787832",
+     "label": "Dead: Discovery Call / Not Interested",
+     "displayOrder": 28,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 1
+    },
+    {
+     "id": "4326787833",
+     "label": "Dead: One Pager / Not Received",
+     "displayOrder": 29,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4327110358",
+     "label": "Dead: One Pager / Low Data Quality",
+     "displayOrder": 30,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4327110359",
+     "label": "Dead: LOI / Pricing Not Agreed",
+     "displayOrder": 31,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4326788794",
+     "label": "Dead: LOI / Contractual Not Agreed",
+     "displayOrder": 32,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4326788795",
+     "label": "Dead: Email Campaign / Branch Retired",
+     "displayOrder": 33,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    }
+   ]
+  },
+  "2464812771": {
+   "label": "Company Ops Cluster 2 India",
+   "stages": [
+    {
+     "id": "4307081975",
+     "label": "LinkedIn sent",
+     "displayOrder": 0,
+     "probability": "0.03",
+     "isClosed": "false",
+     "deals": 2015
+    },
+    {
+     "id": "4275264191",
+     "label": "Cold called assigned",
+     "displayOrder": 1,
+     "probability": "0.05",
+     "isClosed": "false",
+     "deals": 776
+    },
+    {
+     "id": "4307081976",
+     "label": "LinkedIn connected",
+     "displayOrder": 2,
+     "probability": "0.05",
+     "isClosed": "false",
+     "deals": 983
+    },
+    {
+     "id": "4307080899",
+     "label": "No pickup",
+     "displayOrder": 3,
+     "probability": "0.05",
+     "isClosed": "false",
+     "deals": 732
+    },
+    {
+     "id": "4307080900",
+     "label": "Retired: Callback +1 day (use No pickup + task instead)",
+     "displayOrder": 4,
+     "probability": "0.05",
+     "isClosed": "false",
+     "deals": 98
+    },
+    {
+     "id": "4080987863",
+     "label": "Replied",
+     "displayOrder": 5,
+     "probability": "0.12",
+     "isClosed": "false",
+     "deals": 104
+    },
+    {
+     "id": "4275264192",
+     "label": "1st interest sent",
+     "displayOrder": 6,
+     "probability": "0.2",
+     "isClosed": "false",
+     "deals": 85
+    },
+    {
+     "id": "4080987864",
+     "label": "1st interest follow up",
+     "displayOrder": 7,
+     "probability": "0.2",
+     "isClosed": "false",
+     "deals": 56
+    },
+    {
+     "id": "4111134402",
+     "label": "Discovery call",
+     "displayOrder": 8,
+     "probability": "0.35",
+     "isClosed": "false",
+     "deals": 17
+    },
+    {
+     "id": "4275264193",
+     "label": "Call rescheduled",
+     "displayOrder": 9,
+     "probability": "0.35",
+     "isClosed": "false",
+     "deals": 1
+    },
+    {
+     "id": "4132224745",
+     "label": "One pager requested",
+     "displayOrder": 10,
+     "probability": "0.45",
+     "isClosed": "false",
+     "deals": 9
+    },
+    {
+     "id": "4132224746",
+     "label": "One pager follow up",
+     "displayOrder": 11,
+     "probability": "0.45",
+     "isClosed": "false",
+     "deals": 22
+    },
+    {
+     "id": "4080987866",
+     "label": "One pager received",
+     "displayOrder": 12,
+     "probability": "0.55",
+     "isClosed": "false",
+     "deals": 11
+    },
+    {
+     "id": "4275264194",
+     "label": "LOI signed",
+     "displayOrder": 13,
+     "probability": "0.7",
+     "isClosed": "false",
+     "deals": 7
+    },
+    {
+     "id": "4080987873",
+     "label": "Contract signed",
+     "displayOrder": 14,
+     "probability": "0.85",
+     "isClosed": "false",
+     "deals": 0
+    },
+    {
+     "id": "4307080901",
+     "label": "Ops data handover done",
+     "displayOrder": 15,
+     "probability": "0.9",
+     "isClosed": "false",
+     "deals": 5
+    },
+    {
+     "id": "4307080902",
+     "label": "Payment initiation",
+     "displayOrder": 16,
+     "probability": "0.95",
+     "isClosed": "false",
+     "deals": 0
+    },
+    {
+     "id": "4307080903",
+     "label": "Closed/Won",
+     "displayOrder": 17,
+     "probability": "1.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4307080904",
+     "label": "Dead: Cold Call / Wrong Fit",
+     "displayOrder": 18,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 336
+    },
+    {
+     "id": "4307080905",
+     "label": "Dead: Cold Call / Wrong Number",
+     "displayOrder": 19,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 291
+    },
+    {
+     "id": "4307080906",
+     "label": "Dead: Cold Call / Not Interested",
+     "displayOrder": 20,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 193
+    },
+    {
+     "id": "4307080907",
+     "label": "Dead: Cold Call / No Pickup",
+     "displayOrder": 21,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 50
+    },
+    {
+     "id": "4080987878",
+     "label": "Dead: Replied / Not Interested",
+     "displayOrder": 22,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 503
+    },
+    {
+     "id": "4275264195",
+     "label": "Dead: 1st Interest / No Response",
+     "displayOrder": 23,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 8
+    },
+    {
+     "id": "4307080908",
+     "label": "Dead: 1st Interest / Not Interested",
+     "displayOrder": 24,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4080987880",
+     "label": "Dead: Discovery Call / No Show",
+     "displayOrder": 25,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 9
+    },
+    {
+     "id": "4275264196",
+     "label": "Dead: Discovery Call / Rejected by LH2",
+     "displayOrder": 26,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 5
+    },
+    {
+     "id": "4275264197",
+     "label": "Dead: Discovery Call / Not Interested",
+     "displayOrder": 27,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 2
+    },
+    {
+     "id": "4132224747",
+     "label": "Dead: One Pager / Not Received",
+     "displayOrder": 28,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 3
+    },
+    {
+     "id": "4275264198",
+     "label": "Dead: One Pager / Low Data Quality",
+     "displayOrder": 29,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 1
+    },
+    {
+     "id": "4307080909",
+     "label": "Dead: LOI / Pricing Not Agreed",
+     "displayOrder": 30,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4275264199",
+     "label": "Dead: LOI / Contractual Not Agreed",
+     "displayOrder": 31,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 0
+    },
+    {
+     "id": "4275316410",
+     "label": "Dead: Email Campaign / Branch Retired",
+     "displayOrder": 32,
+     "probability": "0.0",
+     "isClosed": "true",
+     "deals": 118
+    }
+   ]
+  }
+ }
+}
