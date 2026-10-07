@@ -32,6 +32,6 @@ db/backup/
 
 # run outputs and local state (contain people, company lists, personal social links)
 out/
-reports/
+/reports/
 .claude/
 docs/audit/apollo/apollo_docs_snapshot/
