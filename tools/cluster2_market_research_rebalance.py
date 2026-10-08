@@ -120,13 +120,38 @@ def main():
         for d in deals:
             reserve_and_unassign(con, d, "Cold called assigned", a.apply)
 
-    # 2: push Market Research leads, split across the two reps
+    # 2: fill priority order — (a) the local reserve pool first (other people's spare leads already sitting
+    #    available, not this rep's own former leads), THEN (b) fresh external leads (Market Research sheet), THEN
+    #    (c) recycling the other rep's No pickup deals, which is the LAST resort because it pulls an active lead
+    #    out of someone else's working pipeline.
+    pushed = {TANISHA: 0, AMISHA: 0}
+    for needer in (TANISHA, AMISHA):
+        pool = con.execute("""SELECT * FROM v_coding_lead_reserve_available WHERE source_account='companyops'
+            AND source_owner_name != ? LIMIT ?""", (NAMES[needer], TARGET - pushed[needer])).fetchall()
+        cols = [c[0] for c in con.execute("SELECT * FROM v_coding_lead_reserve_available LIMIT 0").description]
+        pool = [dict(zip(cols, r)) for r in pool]
+        if pool: print(f"{NAMES[needer]}: filling {len(pool)} from the reserve pool first (other reps' spare leads)")
+        for row in pool:
+            if a.apply:
+                name = dict(first=row["first_name"] or "", last=row["last_name"] or "", company=row["company"] or row["dealname"])
+                did, err = push_new(needer, cold, name, row["phone_e164"], row["linkedin_url"], row["email"], row["lead_source_label"], None,
+                                    f"From the reserve pool (originally {row['source_owner_name']}), pushed 8 Oct 2026.")
+                if err: print("  reserve push fail", row["dealname"], err); continue
+                con.execute("UPDATE ext_coding_lead_reserve SET status='reassigned', reassigned_account='companyops', reassigned_owner_name=?, "
+                           "reassigned_hs_deal_id=?, reassigned_at=?, updated_at=? WHERE reserve_id=?",
+                           (NAMES[needer], did, now_iso(), now_iso(), row["reserve_id"]))
+                con.commit()
+            pushed[needer] += 1
+
+    # 3: Market Research sheet for whatever's still short
     mr = json.load(open("/private/tmp/claude-501/-Users-bhanu-Desktop-LeadGenMonolith/651175ba-81a3-46b1-9ea9-d17bb79d12ea/scratchpad/market_research_pushable.json"))
     print("Market Research pushable:", len(mr))
     if a.apply:
         ensure_option("lead_source", MR_TAG)
-    split = {TANISHA: mr[0::2], AMISHA: mr[1::2]}
-    pushed = {TANISHA: 0, AMISHA: 0}
+    need = {o: max(0, TARGET - pushed[o]) for o in (TANISHA, AMISHA)}
+    split, i = {TANISHA: [], AMISHA: []}, 0
+    for owner in (TANISHA, AMISHA):
+        split[owner] = mr[i:i + need[owner]]; i += need[owner]
     for owner, rows in split.items():
         for r in rows:
             raw = r["raw"]
@@ -136,11 +161,11 @@ def main():
                                     "Market Research sheet (MarketResearch_C2), pushed 8 Oct 2026.")
                 if err: print("  push fail", raw["Company"], err); continue
             pushed[owner] += 1
-    print("pushed Market Research:", {NAMES[o]: n for o, n in pushed.items()})
+    print("pushed (reserve + Market Research):", {NAMES[o]: n for o, n in pushed.items()})
 
-    # 3: fill the remaining gap by recycling the OTHER rep's No pickup deals, crossed
+    # 4: fill whatever's still remaining by recycling the OTHER rep's No pickup deals, crossed — last resort
     gap = {o: TARGET - pushed[o] for o in (TANISHA, AMISHA)}
-    print("remaining gap after Market Research:", {NAMES[o]: n for o, n in gap.items()})
+    print("remaining gap after reserve + Market Research:", {NAMES[o]: n for o, n in gap.items()})
     other = {TANISHA: AMISHA, AMISHA: TANISHA}
     for needer, n in gap.items():
         if n <= 0: continue
