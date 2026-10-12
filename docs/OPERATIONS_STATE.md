@@ -277,6 +277,54 @@ The 8am daily trigger for this (`tools/com.lh2.dailysync.plist`) exists but was 
 this session's active rebuild work and has not been reloaded — check `launchctl list | grep dailysync`
 before assuming it's running.
 
+Also: the slow part of this pull is `counts_for_ids()` reading each deal's full stage history — this
+used to be one HTTP GET per deal (4,765+ calls just for Coding's MAIN portal, 20-40+ min, once over
+1h41m). **Fixed 2026-10-12**: switched to HubSpot's `/batch/read` with `propertiesWithHistory`, which
+caps at 50 deals per call (confirmed live, not documented clearly by HubSpot) instead of 1 — same portal
+now takes ~1.3 minutes. See `_batch_history()` in `daily_sync_pull.py`.
+
+## 6a. HubSpot → Sheet webhook pilot (started 2026-10-12, MAIN portal only, in progress)
+
+The long-term fix for "the pull takes forever" isn't just the batch-read optimization above — it's
+moving off daily full re-pulls entirely, toward HubSpot pushing stage-change events in real time. Started
+as a pilot on Coding's MAIN portal before rolling out to CompanyOps/RAT.
+
+**What exists right now:**
+- A new dedicated Apps Script project, `LH2 Coding MAIN - HubSpot Stage Webhook`
+  (scriptId `1Sr11yUdzu-JVtPFbU5xpJQG1oS35Y1z2zehAPG8npQkpUYNDUbTUENWL`), deployed as a Web App:
+  `https://script.google.com/macros/s/AKfycbxbrkRweWzqmXD_Baza3xlhvPTPbQRTCO-a6h1DkF0eGqDOBHYffENYXP0W0z2jzP3aSw/exec`
+- It writes to a new dedicated sheet, `HubSpot Stage Webhook Log (Coding MAIN) - pilot`
+  (spreadsheetId `1lgmKnr2mjkQJDo2woPGZAQv8Zv3qvMIg4ENff1bd3iA`), tab `RawWebhookLog`.
+- **Deliberately logs raw payloads only, no parsing yet** — same proven pattern as the existing OutFlo
+  webhook receiver, so the real payload shape gets confirmed before any aggregation logic is written
+  against it (guessing wrong here already cost real data-routing bugs once this session, on the Apollo
+  webhook — see section 5's history, same mistake avoided here on purpose).
+- **`HUBSPOT_KEY_MAIN` was replaced today.** It used to be a HubSpot **Service Key** (an older credential
+  type), which turned out to have **no webhook support at all** — no Webhooks tab exists for Service Keys.
+  Had to create a real **Private App** (`LH2 Coding MAIN - Private App`) with matching scopes, which *does*
+  support webhook subscriptions. `.env`'s `HUBSPOT_KEY_MAIN` now points to that Private App's token — the
+  old Service Key still exists in HubSpot but is no longer referenced anywhere in this repo. If anything
+  else outside this repo still uses the old Service Key token, it'll keep working (not revoked), but new
+  work should treat the Private App as the real one going forward.
+- A `deal.propertyChange` webhook subscription on `dealstage` is live and Active on that Private App.
+- **Confirmed blocked**: a second subscription for Task events (needed for Follow-up-coverage metrics,
+  section 7) can't be added — this portal's plan tier doesn't expose any Tasks-related scope at all. Not
+  a webhook limitation, a plan-tier wall. See section 7's Follow-up-coverage entry.
+
+**Not done yet:**
+- No test event has been confirmed landing in `RawWebhookLog` yet (needs a live deal-stage move in
+  HubSpot once the subscription is active + the one-time Apps Script authorization is done).
+- No parsing/aggregation logic exists — that's the next step once a real payload is captured.
+- CompanyOps and RAT portals haven't gotten their own receiver/subscription yet — this is pilot-only on
+  MAIN. Same Service-Key-vs-Private-App check needs doing for both before replicating (check whether
+  `HUBSPOT_KEY_COMPANYOPS`/`HUBSPOT_KEY_RAT` are Service Keys or already Private Apps).
+- No durable local store (DB table) for captured events exists yet — right now it's just a raw log in a
+  Sheet. The real design still needs: a `db/leadgen.sqlite` table for structured stage-change events, a
+  migration for it, and `daily_sync_pull.py`'s WTD/MTD/ITD logic eventually reading from that local store
+  instead of re-querying HubSpot live, once enough real-time history has accumulated to trust it over a
+  fresh pull. Historical ITD still needs at least one full pull regardless (webhooks only capture events
+  from when they go live, forward).
+
 ## 7. Pending / not done yet
 
 - **The 2 non-Indian-number Coding deals** (section 5) — need manual archive in HubSpot.
@@ -295,8 +343,14 @@ before assuming it's running.
   but not pushed to daily like Coding/Cluster 1/Cluster 2.
 - **The Firestore/cloud-engine migration** — deliberately deferred. Trigger (per the user, when first
   proposed): once every vertical's sourcing pipeline is live and stable. Not started.
-- Per-rep follow-up-coverage metrics in the Performance Report are blocked on whether reps actually log
-  real HubSpot Tasks — currently shown as `n/a`, unverified either way.
+- Per-rep follow-up-coverage metrics in the Performance Report are blocked — **confirmed 2026-10-12, not
+  just unverified**: the MAIN portal's HubSpot plan tier does not expose the Tasks object to the API at
+  all (no `crm.objects.tasks.*` / `crm.schemas.tasks.*` scope exists anywhere in the Private App scope
+  picker, confirmed by search). This is a plan-tier wall, not a webhook-vs-pull problem or a naming
+  issue — stays `n/a` until/unless the HubSpot plan is upgraded to a tier that exposes Tasks (worth
+  confirming the exact tier with HubSpot directly before assuming any specific plan name). Affects every
+  Follow-up-coverage row AND the No-Pickup chain's "create a callback task" step, which currently has no
+  way to be verified as actually happening via API on any portal using this tier.
 - "Same-day script-shared coverage" is structurally degenerate in the current stage model (VC-completed
   and script-shared collapse into the same transition on the proceed path) — flagged, not fixed, would
   need a stage redesign.
