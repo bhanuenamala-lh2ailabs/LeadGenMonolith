@@ -307,9 +307,15 @@ as a pilot on Coding's MAIN portal before rolling out to CompanyOps/RAT.
   else outside this repo still uses the old Service Key token, it'll keep working (not revoked), but new
   work should treat the Private App as the real one going forward.
 - A `deal.propertyChange` webhook subscription on `dealstage` is live and Active on that Private App.
-- **Confirmed blocked**: a second subscription for Task events (needed for Follow-up-coverage metrics,
-  section 7) can't be added — this portal's plan tier doesn't expose any Tasks-related scope at all. Not
-  a webhook limitation, a plan-tier wall. See section 7's Follow-up-coverage entry.
+- **Task webhook SUBSCRIPTION can't be added via the Private App Webhooks UI** — no Tasks-related scope
+  appears in that specific scope-picker search ("tas" only matches the unrelated `ctas.read"). CORRECTED
+  2026-10-12, same day: this does NOT mean Tasks are unreadable via the API, as first wrongly concluded
+  below in section 7 - live-tested directly and `crm/v3/objects/tasks` (both GET and `/search`, with real
+  properties like `hs_task_status`) returns 200 with real data (452 tasks exist on this portal) using the
+  exact same token. The scope picker UI not listing a named scope is not proof the underlying API is
+  inaccessible - test empirically before concluding a hard wall exists. Net effect: no Task *webhook* yet
+  (that specific UI path is blocked), but a scheduled PULL of tasks (same batch pattern already built for
+  deals/contacts) works today, with no plan upgrade needed. See section 7's Follow-up-coverage entry.
 
 **Not done yet:**
 - No test event has been confirmed landing in `RawWebhookLog` yet (needs a live deal-stage move in
@@ -343,14 +349,17 @@ as a pilot on Coding's MAIN portal before rolling out to CompanyOps/RAT.
   but not pushed to daily like Coding/Cluster 1/Cluster 2.
 - **The Firestore/cloud-engine migration** — deliberately deferred. Trigger (per the user, when first
   proposed): once every vertical's sourcing pipeline is live and stable. Not started.
-- Per-rep follow-up-coverage metrics in the Performance Report are blocked — **confirmed 2026-10-12, not
-  just unverified**: the MAIN portal's HubSpot plan tier does not expose the Tasks object to the API at
-  all (no `crm.objects.tasks.*` / `crm.schemas.tasks.*` scope exists anywhere in the Private App scope
-  picker, confirmed by search). This is a plan-tier wall, not a webhook-vs-pull problem or a naming
-  issue — stays `n/a` until/unless the HubSpot plan is upgraded to a tier that exposes Tasks (worth
-  confirming the exact tier with HubSpot directly before assuming any specific plan name). Affects every
-  Follow-up-coverage row AND the No-Pickup chain's "create a callback task" step, which currently has no
-  way to be verified as actually happening via API on any portal using this tier.
+- Per-rep follow-up-coverage metrics in the Performance Report are still `n/a` but **NOT actually
+  blocked** — corrected 2026-10-12, same day as the wrong conclusion was first written here. Tasks ARE
+  readable via the API with the current token: `crm/v3/objects/tasks` and `/search` both return 200 with
+  real data (`hs_task_status`, `hs_task_subject`, etc., 452 real tasks on this portal), live-tested
+  directly. The earlier "plan-tier wall" claim was wrong — it was based on a scope NAME not appearing in
+  the Private App's webhook-scope picker UI, which turned out not to mean the underlying API is
+  inaccessible. What's actually missing is just the implementation: pull each deal's associated tasks in
+  the same batch pass `daily_sync_pull.py` already does for deals/contacts (same association-batch-read
+  pattern used everywhere else in this file), filter out HubSpot's demo "(Sample task)" seed data, and
+  check `hs_task_status` against the call-picked/interested/VC-no-show rules. No plan upgrade needed. Not
+  built yet — next real step when this gets picked up.
 - "Same-day script-shared coverage" is structurally degenerate in the current stage model (VC-completed
   and script-shared collapse into the same transition on the proceed path) — flagged, not fixed, would
   need a stage redesign.
