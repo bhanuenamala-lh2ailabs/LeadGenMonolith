@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Runs tools/daily_sync_pull.py every morning at 8:00am (local laptop time) and writes both the
+  Daily Sync tab (Supply Team Mapping sheet) and the Performance Report sheet's 5 per-team tabs.
+
+  Requires this laptop to be ON and AWAKE at 8am - launchd does NOT wake a sleeping Mac on its own
+  (pmset -g sched can schedule a wake, see the install instructions). If the laptop is off/asleep at
+  8am, launchd runs it as soon as the machine wakes (StartCalendarInterval fires the next time the
+  condition is met, it does not queue up missed runs retroactively beyond that).
+
+  Install:
+    cp tools/com.lh2.dailysync.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.lh2.dailysync.plist
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.lh2.dailysync.plist
+    rm ~/Library/LaunchAgents/com.lh2.dailysync.plist
+
+  Logs: tools/logs/daily_sync_stdout.log and tools/logs/daily_sync_stderr.log (check these first if
+  the sheets don't update - a stale HubSpot token or a changed stage id would show up here, not in
+  any Google Sheet).
+
+  Test without waiting for 8am:
+    launchctl start com.lh2.dailysync
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.lh2.dailysync</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/bhanu/Desktop/LeadGenMonolith/.venv/bin/python</string>
+    <string>/Users/bhanu/Desktop/LeadGenMonolith/tools/daily_sync_pull.py</string>
+    <string>--write</string>
+    <string>--write-performance-report</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/bhanu/Desktop/LeadGenMonolith</string>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>8</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/bhanu/Desktop/LeadGenMonolith/tools/logs/daily_sync_stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/bhanu/Desktop/LeadGenMonolith/tools/logs/daily_sync_stderr.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

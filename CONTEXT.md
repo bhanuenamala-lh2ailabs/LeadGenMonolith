@@ -36,7 +36,7 @@ LH2 acquires dormant assets from Indian companies (pre-2024 **codebases**, and i
 ## Where everything is (this repo)
 | Need | Go to |
 |---|---|
-| Unified DB | `db/leadgen.sqlite` (SQLite, 14 versioned migrations). Dictionary: `docs/DATA_DICTIONARY.md`. Design decisions: `docs/review/schema-decisions.md` |
+| Unified DB | `db/leadgen.sqlite` (SQLite, 27 versioned migrations). Dictionary: `docs/DATA_DICTIONARY.md`. Design decisions: `docs/review/schema-decisions.md` |
 | Run things | `docs/RUNBOOK.md`; CLI `.venv/bin/python -m leadgen …` |
 | Original repos, untouched | `legacy/{companyOps,RapidActionTeam,hubspot}` (+ git history: `archive/git_bundles/*.bundle`) |
 | Credentials | `.env` (namespaced per portal), `secrets/` (Google). Both gitignored |
