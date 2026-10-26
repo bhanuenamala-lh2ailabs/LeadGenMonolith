@@ -10,9 +10,19 @@
  * (delete-all-then-add-fresh) rather than SpreadsheetApp's shiftRowGroupDepth (proven non-idempotent -
  * see rebuildGroups_'s comment).
  *
- * SCOPE: cluster1, cluster2, coding ONLY - same permanent decision as before ("only coops 1 and 2 and
- * coding on three accounts as only those have hubspot changes and sops made to capture details to
- * compute these numbers"). coops_global/rat are not written by this script.
+ * SCOPE: cluster1, cluster2, coding, engineering (RAT) - EXTENDED 2026-10-22 per explicit user ask to
+ * also cover Engineering Datasets at the 6pm sync. coops_global is still not written by this script
+ * (no SOP/rep model wired up for it, per the original scope decision - "only coops 1 and 2 and coding
+ * on three accounts as only those have hubspot changes and sops made to capture details to compute
+ * these numbers"). Engineering's constants (REP_MAPS_/rowFormulas_/BUCKET_STAGES_/targets/portal) are
+ * ported verbatim from daily_sync_pull.py's "rat" vertical (its internal key - this file's user-facing
+ * name is "engineering" to match the Performance Report tab title "Engineering Datasets"). IMPORTANT
+ * DIVERGENCE FROM cluster1/cluster2/coding, carried over faithfully from the Python reference: engineering
+ * gets NO granular/follow-up-coverage stats (Same day lead coverage, Email/WhatsApp touch %, Follow-up
+ * coverage x3, Same day script coverage all render BLANK, not computed) - daily_sync_pull.py is explicit
+ * that rat "never got the granular HubSpot schema changes (no Task-coverage wiring, no stage-bucket
+ * definitions) that coding/cluster1/cluster2 have" and renders those cells blank by deliberate policy,
+ * not as a bug. See HAS_GRANULAR_ below.
  *
  * DELIBERATE DEVIATION FROM THE PYTHON REFERENCE'S *STRUCTURE* (not its output): the Python file does
  * THREE separate passes per vertical - one for itd/mtd/wtd+owner counts (counts_for_ids), one for the
@@ -33,10 +43,10 @@
  * SETUP (one-time, by a human with Apps Script editor access):
  *   1. Run bootstrapApiKeys_() once from the editor and approve the permissions dialog (grants
  *      script.external_request/spreadsheets/script.scriptapp, already declared in appsscript.json).
- *   2. Run testDryRun_('cluster1') (or 'cluster2'/'coding') to sanity-check pulled numbers via Logger.log
- *      WITHOUT writing the sheet - cross-check against a fresh `python3 tools/daily_sync_pull.py` run's
- *      numbers for the same vertical before trusting this.
- *   3. Once verified, run runOneVerticalLive_('cluster1') etc. (or runDailySyncNow_() for all three) to do
+ *   2. Run testDryRun_('cluster1') (or 'cluster2'/'coding'/'engineering') to sanity-check pulled numbers
+ *      via Logger.log WITHOUT writing the sheet - cross-check against a fresh `python3 tools/daily_sync_pull.py`
+ *      run's numbers for the same vertical before trusting this.
+ *   3. Once verified, run runOneVerticalLive_('cluster1') etc. (or runDailySyncNow_() for all four) to do
  *      a real write, then read the sheet back to confirm.
  *   4. Only after a verified-correct live write: run installTrigger() to install the recurring schedule.
  */
@@ -285,6 +295,10 @@ var REP_MAPS_ = {
   cluster2: [['168015618', 'Tanisha'], ['168015679', 'Amisha']],
   coding: [['96574824', 'Lamiya'], ['96573782', 'Yuktha'], ['168572330', 'Shagufta'],
            ['168341981', 'Vaishnavi'], ['98906502', 'Harsha']],
+  // Engineering Datasets ("rat" vertical in the Python reference)'s own POCs, in the RAT account's own
+  // "Rapid Action Team" pipeline (2575252183) - NOT the "Coding" pipeline (2608440047) in that same RAT
+  // account, which is Harsha's Coding-overflow queue, a different vertical entirely (see portalsFor_).
+  engineering: [['168541136', 'Prerna'], ['168829625', 'Rohan'], ['169456665', 'Hemanth']],
 };
 
 // ---------------------------------------------------------------------------------------------------
@@ -331,6 +345,20 @@ function rowFormulas_(vertical, c) {
       'Contract/LOI signed': (c['__loi_dedup__'] !== undefined) ? c['__loi_dedup__'] : sumStages_(c, ['LOI', 'Deal Contract Signed', 'Closed/Won']),
     };
   }
+  if (vertical === 'engineering') {
+    // Ported verbatim from daily_sync_pull.py's row_formulas() "rat" branch.
+    return {
+      'Leads assigned': sumStages_(c, ['Cold Called Assigned']),
+      'Calls attempted': sumStages_(c, ['No Pickup', 'Callback', 'Dead: ColdCall/WrongNumber', 'Dead: ColdCall/NotInterested', 'Replied']),
+      'Calls picked': sumStages_(c, ['Replied', 'Dead: ColdCall/NotInterested']),
+      'Interested': sumStages_(c, ['1st Interest Sent']),
+      'VC setup': sumStages_(c, ['Discovery Call']),
+      'VC completed': sumStages_(c, ['Dead: DiscoveryCall/RejectedByLH2', 'Dead: DiscoveryCall/NotInterested', 'Sample Requested']),
+      'Script/1-pager shared': sumStages_(c, ['Sample Requested']),
+      'Script results/1-pager filled': sumStages_(c, ['Sample Received']),
+      'Contract/LOI signed': (c['__loi_dedup__'] !== undefined) ? c['__loi_dedup__'] : sumStages_(c, ['Contract Signed']),
+    };
+  }
   throw new Error('unknown vertical ' + vertical);
 }
 
@@ -361,17 +389,31 @@ var REP_METRIC_LABELS_CODING_ = {
   // and Deal Contract Signed in the same week double-counts across its two days here. Flagged, not fixed.
   'Contract/LOI signed': ['LOI', 'Deal Contract Signed', 'Closed/Won'],
 };
-var REP_METRIC_LABELS_ = { cluster1: REP_METRIC_LABELS_C1C2_, cluster2: REP_METRIC_LABELS_C1C2_, coding: REP_METRIC_LABELS_CODING_ };
+var REP_METRIC_LABELS_ENGINEERING_ = {
+  'Leads assigned': ['Cold Called Assigned'],
+  'Calls attempted': ['No Pickup', 'Callback', 'Dead: ColdCall/WrongNumber', 'Dead: ColdCall/NotInterested', 'Replied'],
+  'Calls picked': ['Replied', 'Dead: ColdCall/NotInterested'],
+  'Interested': ['1st Interest Sent'],
+  'VC setup': ['Discovery Call'],
+  'VC completed': ['Dead: DiscoveryCall/RejectedByLH2', 'Dead: DiscoveryCall/NotInterested', 'Sample Requested'],
+  'Script/1-pager shared': ['Sample Requested'],
+  'Script results/1-pager filled': ['Sample Received'],
+  'Contract/LOI signed': ['Contract Signed'],
+};
+var REP_METRIC_LABELS_ = { cluster1: REP_METRIC_LABELS_C1C2_, cluster2: REP_METRIC_LABELS_C1C2_, coding: REP_METRIC_LABELS_CODING_,
+                           engineering: REP_METRIC_LABELS_ENGINEERING_ };
 
 var LOI_DEDUP_LABELS_ = {
   coding: { 'LOI': true, 'Deal Contract Signed': true, 'Closed/Won': true },
   cluster1: { 'LOI signed': true },
   cluster2: { 'LOI signed': true },
+  engineering: { 'Contract Signed': true },
 };
 
 // ---------------------------------------------------------------------------------------------------
 // 6. BUCKET_STAGES - ported verbatim from daily_sync_pull.py's BUCKET_STAGES (the dict near the bottom
-//    of that file, used by _load_granular_stats). Only cluster1/cluster2/coding entries needed here.
+//    of that file, used by _load_granular_stats). cluster1/cluster2/coding/engineering entries needed
+//    here (coops_global is out of scope - see file header SCOPE).
 // ---------------------------------------------------------------------------------------------------
 var BUCKET_STAGES_ = {
   cluster1: {
@@ -395,16 +437,41 @@ var BUCKET_STAGES_ = {
     calls_attempted: ['No Pickup - Attempt 1', 'No Pickup - Attempt 2', 'No Pickup - Attempt 3', 'Dead/ColdCall/NoPickup', 'Dead/ColdCall/WrongNumber', 'Dead/ColdCall/Not Interested', 'Interested'],
     vc_setup: ['GMeet Fixed'], script_shared: ['Script Shared'],
   },
+  // Ported verbatim from daily_sync_pull.py's BUCKET_STAGES["rat"] - note NO vc_setup/script_shared keys
+  // (matches the Python dict exactly; harmless here too since every read of those two keys elsewhere in
+  // this file is already `buckets.vc_setup && ...` / `buckets.script_shared && ...` guarded). These
+  // picked/interested/vc_noshow entries are not actually exercised for 'engineering' at runtime - see
+  // HAS_GRANULAR_ below - kept only for shape parity with the Python reference.
+  engineering: {
+    picked: ['Replied', 'Dead: ColdCall/NotInterested'], interested: ['1st Interest Sent'], vc_noshow: null,
+    leads_assigned: ['Cold Called Assigned'],
+    calls_attempted: ['No Pickup', 'Callback', 'Dead: ColdCall/WrongNumber', 'Dead: ColdCall/NotInterested', 'Replied'],
+  },
 };
+
+// ---------------------------------------------------------------------------------------------------
+// 6b. Which verticals get the Task-association/email-coverage granular stats (Same day lead coverage,
+//     Email/WhatsApp touch %, Follow-up coverage x3, Same day script coverage). Ported verbatim from
+//     daily_sync_pull.py's documented policy: "coops_global/rat never got the granular HubSpot schema
+//     changes (no Task-coverage wiring, no stage-bucket definitions) that coding/cluster1/cluster2 have
+//     - those two verticals now render truly BLANK ('') for every granular cell instead of a literal
+//     'n/a' string, since there's nothing partially-computed to report". engineering (rat) renders
+//     blank, not computed - see pullVertical_ (skips the Task-fetch entirely, saving HubSpot calls too)
+//     and buildFullRows_ (renders '' instead of a percentage/count for the affected rows).
+// ---------------------------------------------------------------------------------------------------
+var HAS_GRANULAR_ = { cluster1: true, cluster2: true, coding: true, engineering: false };
 
 // ---------------------------------------------------------------------------------------------------
 // 7. Targets - ported verbatim from daily_sync_pull.py's DAILY_LEADS/OLD_WEEKLY/FACTOR/target().
 // ---------------------------------------------------------------------------------------------------
-var DAILY_LEADS_ = { coding: 500, cluster1: 200, cluster2: 200 };
+var DAILY_LEADS_ = { coding: 500, cluster1: 200, cluster2: 200, engineering: 200 };
 var OLD_WEEKLY_ = {
   coding:   { 'Leads assigned': 1250, 'Calls attempted': 1250, 'Calls picked': 250, 'Interested': null, 'VC setup': 50, 'VC completed': null, 'Script/1-pager shared': 40, 'Script results/1-pager filled': 24, 'Contract/LOI signed': 5 },
   cluster1: { 'Leads assigned': 1000, 'Calls attempted': 1000, 'Calls picked': 150, 'Interested': null, 'VC setup': 15, 'VC completed': null, 'Script/1-pager shared': 12, 'Script results/1-pager filled': 6, 'Contract/LOI signed': 3 },
   cluster2: { 'Leads assigned': 1000, 'Calls attempted': 1000, 'Calls picked': 150, 'Interested': null, 'VC setup': 15, 'VC completed': null, 'Script/1-pager shared': 12, 'Script results/1-pager filled': 6, 'Contract/LOI signed': 3 },
+  // = Targets tab's '3.4 Specialty Datasets' column (owner: Kartik) - RAT has no Targets-tab column of
+  // its own, so it borrows this one, same as daily_sync_pull.py's OLD_WEEKLY["rat"] comment explains.
+  engineering: { 'Leads assigned': 1000, 'Calls attempted': 1000, 'Calls picked': 200, 'Interested': null, 'VC setup': 40, 'VC completed': null, 'Script/1-pager shared': 30, 'Script results/1-pager filled': 21, 'Contract/LOI signed': 4 },
 };
 function factorFor_(vertical) { return (DAILY_LEADS_[vertical] * 5) / OLD_WEEKLY_[vertical]['Leads assigned']; }
 
@@ -433,6 +500,10 @@ function portalsFor_(vertical) {
     { key: 'HUBSPOT_KEY_COMPANYOPS', pipeline: '2608440044', oldPipeline: '2464812771' },
     { key: 'HUBSPOT_KEY_RAT', pipeline: '2608440047', oldPipeline: '2575252183' },
   ];
+  // Engineering Datasets: the RAT account's OWN "Rapid Action Team" pipeline (2575252183) - NOT the
+  // "2608440047" pipeline above, which is the same RAT account's Coding-overflow queue (Harsha), a
+  // different vertical. No oldPipeline/migration - REASSIGN_ is Coding-specific only.
+  if (vertical === 'engineering') return [{ key: 'HUBSPOT_KEY_RAT', pipeline: '2575252183', oldPipeline: null }];
   throw new Error('unknown vertical ' + vertical);
 }
 
@@ -451,6 +522,7 @@ function pullVertical_(vertical, weekStart, monthStart, today) {
   var portals = portalsFor_(vertical);
   var buckets = BUCKET_STAGES_[vertical];
   var loiDedupSet = LOI_DEDUP_LABELS_[vertical] || {};
+  var hasGranular = HAS_GRANULAR_[vertical]; // false for 'engineering' - see HAS_GRANULAR_'s comment
   var weekStartIso = isoDateIst_(weekStart), todayIso = isoDateIst_(today);
 
   var teamItd = {}, teamMtd = {}, teamWtd = {};
@@ -471,33 +543,37 @@ function pullVertical_(vertical, weekStart, monthStart, today) {
     for (var i = 0; i < deals.length; i++) ids.push(deals[i].id);
     var historyByDeal = batchHistory_(h, ids);
 
-    // --- bucket matching off CURRENT dealstage, for Task/email coverage below ---
-    var pickedIds = [], interestedIds = [], noshowIds = [], nonpickedIds = [];
-    for (var di = 0; di < deals.length; di++) {
-      var props = deals[di].properties || {};
-      var curLabel = idToLabel[props.dealstage];
-      if (buckets.picked.indexOf(curLabel) !== -1) pickedIds.push(deals[di].id); else nonpickedIds.push(deals[di].id);
-      if (buckets.interested.indexOf(curLabel) !== -1) interestedIds.push(deals[di].id);
-      if (buckets.vc_noshow && buckets.vc_noshow.indexOf(curLabel) !== -1) { noshowIds.push(deals[di].id); gAnyNoshowStage = true; }
-      gWeightedAtt += Number(props.call_attempts_count || 0);
-      gTotalN++;
-    }
-    var taskIdsByDeal = batchTaskAssociations_(h, ids);
-    var emailIds = emailTaskIds_(h);
-    function hits_(arr) { var c = 0; for (var x = 0; x < arr.length; x++) if ((taskIdsByDeal[arr[x]] || []).length) c++; return c; }
-    function emailHits_(arr) {
-      var c = 0;
-      for (var x = 0; x < arr.length; x++) {
-        var tids = taskIdsByDeal[arr[x]] || [];
-        for (var y = 0; y < tids.length; y++) { if (emailIds[tids[y]]) { c++; break; } }
+    // --- bucket matching off CURRENT dealstage, for Task/email coverage below --- skipped entirely for
+    // verticals with hasGranular=false (engineering) - saves the Task-association/email-search HubSpot
+    // calls too, matching daily_sync_pull.py's "rat never got the Task-coverage wiring" policy.
+    if (hasGranular) {
+      var pickedIds = [], interestedIds = [], noshowIds = [], nonpickedIds = [];
+      for (var di = 0; di < deals.length; di++) {
+        var props = deals[di].properties || {};
+        var curLabel = idToLabel[props.dealstage];
+        if (buckets.picked.indexOf(curLabel) !== -1) pickedIds.push(deals[di].id); else nonpickedIds.push(deals[di].id);
+        if (buckets.interested.indexOf(curLabel) !== -1) interestedIds.push(deals[di].id);
+        if (buckets.vc_noshow && buckets.vc_noshow.indexOf(curLabel) !== -1) { noshowIds.push(deals[di].id); gAnyNoshowStage = true; }
+        gWeightedAtt += Number(props.call_attempts_count || 0);
+        gTotalN++;
       }
-      return c;
+      var taskIdsByDeal = batchTaskAssociations_(h, ids);
+      var emailIds = emailTaskIds_(h);
+      var hits_ = function (arr) { var c = 0; for (var x = 0; x < arr.length; x++) if ((taskIdsByDeal[arr[x]] || []).length) c++; return c; };
+      var emailHits_ = function (arr) {
+        var c = 0;
+        for (var x = 0; x < arr.length; x++) {
+          var tids = taskIdsByDeal[arr[x]] || [];
+          for (var y = 0; y < tids.length; y++) { if (emailIds[tids[y]]) { c++; break; } }
+        }
+        return c;
+      };
+      gPickedH += hits_(pickedIds); gPickedN += pickedIds.length;
+      gInterestedH += hits_(interestedIds); gInterestedN += interestedIds.length;
+      gNoshowH += hits_(noshowIds); gNoshowN += noshowIds.length;
+      gAllH += emailHits_(ids); gAllN += ids.length;
+      gNonpickedH += emailHits_(nonpickedIds); gNonpickedN += nonpickedIds.length;
     }
-    gPickedH += hits_(pickedIds); gPickedN += pickedIds.length;
-    gInterestedH += hits_(interestedIds); gInterestedN += interestedIds.length;
-    gNoshowH += hits_(noshowIds); gNoshowN += noshowIds.length;
-    gAllH += emailHits_(ids); gAllN += ids.length;
-    gNonpickedH += emailHits_(nonpickedIds); gNonpickedN += nonpickedIds.length;
 
     // --- per-deal full-history walk: itd/mtd/wtd (+owner, +LOI-dedup), rep-day buckets, same-day stats ---
     var portalItd = {}, portalMtd = {}, portalWtd = {};
@@ -556,20 +632,25 @@ function pullVertical_(vertical, weekStart, monthStart, today) {
         }
 
         // Same-day-lead / same-day-script-shared: earliest EVER (no week/month bound), matching
-        // _load_granular_stats' assigned_ts/attempt_ts/vc_setup_ts/script_shared_ts exactly.
-        if (buckets.leads_assigned.indexOf(canon) !== -1 && (assignedMs === null || tsMs < assignedMs)) assignedMs = tsMs;
-        if (buckets.calls_attempted.indexOf(canon) !== -1 && (attemptMs === null || tsMs < attemptMs)) attemptMs = tsMs;
-        if (buckets.vc_setup && buckets.vc_setup.indexOf(canon) !== -1 && (vcSetupMs === null || tsMs < vcSetupMs)) vcSetupMs = tsMs;
-        if (buckets.script_shared && buckets.script_shared.indexOf(canon) !== -1 && (scriptSharedMs === null || tsMs < scriptSharedMs)) scriptSharedMs = tsMs;
+        // _load_granular_stats' assigned_ts/attempt_ts/vc_setup_ts/script_shared_ts exactly. Skipped for
+        // hasGranular=false verticals (engineering) - Python renders these blank for rat too (g=None).
+        if (hasGranular) {
+          if (buckets.leads_assigned.indexOf(canon) !== -1 && (assignedMs === null || tsMs < assignedMs)) assignedMs = tsMs;
+          if (buckets.calls_attempted.indexOf(canon) !== -1 && (attemptMs === null || tsMs < attemptMs)) attemptMs = tsMs;
+          if (buckets.vc_setup && buckets.vc_setup.indexOf(canon) !== -1 && (vcSetupMs === null || tsMs < vcSetupMs)) vcSetupMs = tsMs;
+          if (buckets.script_shared && buckets.script_shared.indexOf(canon) !== -1 && (scriptSharedMs === null || tsMs < scriptSharedMs)) scriptSharedMs = tsMs;
+        }
       }
 
-      if (assignedMs !== null) {
-        gSameDayTotal++;
-        if (attemptMs !== null && sameIstDay_(assignedMs, attemptMs)) gSameDayHit++;
-      }
-      if (vcSetupMs !== null) {
-        gSameDayScriptTotal++;
-        if (scriptSharedMs !== null && sameIstDay_(vcSetupMs, scriptSharedMs)) gSameDayScriptHit++;
+      if (hasGranular) {
+        if (assignedMs !== null) {
+          gSameDayTotal++;
+          if (attemptMs !== null && sameIstDay_(assignedMs, attemptMs)) gSameDayHit++;
+        }
+        if (vcSetupMs !== null) {
+          gSameDayScriptTotal++;
+          if (scriptSharedMs !== null && sameIstDay_(vcSetupMs, scriptSharedMs)) gSameDayScriptHit++;
+        }
       }
       if (oid) {
         for (var canon2 in earliestInWeekByCanon) {
@@ -590,7 +671,9 @@ function pullVertical_(vertical, weekStart, monthStart, today) {
   }
 
   function pctOrNone_(hv, nv) { return nv ? round1_(100 * hv / nv) : null; }
-  var granular = {
+  // null for hasGranular=false verticals (engineering) - matches daily_sync_pull.py's granular_stats.get(v)
+  // returning None for rat, which buildFullRows_'s Python equivalent treats as "render blank", not "n/a".
+  var granular = hasGranular ? {
     avgAttempts: gTotalN ? Math.round((gWeightedAtt / gTotalN) * 100) / 100 : 0,
     pctTouch: gAllN ? round1_(100 * gAllH / gAllN) : 0,
     pctNonpickedTouch: gNonpickedN ? round1_(100 * gNonpickedH / gNonpickedN) : 0,
@@ -599,7 +682,7 @@ function pullVertical_(vertical, weekStart, monthStart, today) {
     pctFollowupNoshow: (buckets.vc_noshow || gAnyNoshowStage) ? pctOrNone_(gNoshowH, gNoshowN) : 'no_noshow_stage',
     pctSameDayLead: gSameDayTotal ? round1_(100 * gSameDayHit / gSameDayTotal) : null,
     pctSameDayScript: gSameDayScriptTotal ? round1_(100 * gSameDayScriptHit / gSameDayScriptTotal) : null,
-  };
+  } : null;
 
   return { itd: teamItd, mtd: teamMtd, wtd: teamWtd, ownerItd: ownerItd, ownerMtd: ownerMtd, ownerWtd: ownerWtd,
            ownerDay: ownerDay, granular: granular };
@@ -626,22 +709,30 @@ function buildFullRows_(vertical, pulled, wtdDays, mtdDays) {
 
   var nCallers = (REP_MAPS_[vertical] || []).length;
   function fuVal(key) {
+    if (!g) return ''; // no granular schema for this vertical (engineering) - blank, not '0 in bucket'
     var v2 = g[key];
     if (v2 === 'no_noshow_stage') return 'n/a (no no-show stage defined)';
     if (v2 === null || v2 === undefined) return '0 in bucket';
     return v2 + '%';
   }
-  var sameDayLead = (g.pctSameDayLead === null) ? '0 in bucket' : g.pctSameDayLead + '%';
-  var sameDayScript = (g.pctSameDayScript === null || g.pctSameDayScript === undefined) ? '0 in bucket' : g.pctSameDayScript + '%';
+  // CHANGED (ported from daily_sync_pull.py's documented policy): a vertical with no granular HubSpot
+  // schema wired up (engineering/rat - see HAS_GRANULAR_) renders every granular cell truly BLANK ('')
+  // instead of a computed value - "there's nothing partially-computed to report, just an intentionally
+  // unsupported vertical for this round of work."
+  var sameDayLead = !g ? '' : (g.pctSameDayLead === null) ? '0 in bucket' : g.pctSameDayLead + '%';
+  var sameDayScript = !g ? '' : (g.pctSameDayScript === null || g.pctSameDayScript === undefined) ? '0 in bucket' : g.pctSameDayScript + '%';
+  var avgAttempts = g ? g.avgAttempts : '';
+  var pctNonpickedTouch = g ? (g.pctNonpickedTouch + '%') : '';
+  var pctTouch = g ? (g.pctTouch + '%') : '';
 
   return [
     flatRow_('Callers', nCallers),
     coreRow('Leads assigned', 'Leads assigned'),
     flatRow_('Same day Lead coverage (% of same day leads where call is attempted)', sameDayLead),
-    flatRow_('Call attempts per lead', g.avgAttempts),
+    flatRow_('Call attempts per lead', avgAttempts),
     coreRow('Calls attempted', 'Calls attempted'),
-    flatRow_('Email/ Whatsapp coverage% on non-picked call leads', g.pctNonpickedTouch + '%'),
-    flatRow_('Email/ whatsapp coverage% on all leads', g.pctTouch + '%'),
+    flatRow_('Email/ Whatsapp coverage% on non-picked call leads', pctNonpickedTouch),
+    flatRow_('Email/ whatsapp coverage% on all leads', pctTouch),
     coreRow('Calls picked', 'Calls picked'),
     flatRow_('Follow-up coverage on follow-up marked call-picked leads', fuVal('pctFollowupPicked')),
     coreRow('Interested', 'Interested'),
@@ -718,7 +809,7 @@ function buildRepBlockRows_(vertical, oid, name, pulled, nReps, weekStart, today
 //     using native SpreadsheetApp calls wherever they are equivalent (simpler + no extra API scopes
 //     needed), and the raw Sheets API only for row/column GROUP management - see rebuildGroups_().
 // ---------------------------------------------------------------------------------------------------
-var PERF_TAB_ = { cluster1: 'Company Ops (Cluster-1)', cluster2: 'Company Ops (Cluster-2)', coding: 'Coding' };
+var PERF_TAB_ = { cluster1: 'Company Ops (Cluster-1)', cluster2: 'Company Ops (Cluster-2)', coding: 'Coding', engineering: 'Engineering Datasets' };
 var WEEK_BANNER_RE_ = /week starting Mon (\d{4}-\d{2}-\d{2})/;
 var NAVY_HEX_ = '#1E335B';  // {red:0.1176,green:0.2,blue:0.3569} - same palette as the Daily Sync tab
 var TEAL_HEX_ = '#198C7F';  // {red:0.098,green:0.549,blue:0.498}
@@ -884,30 +975,28 @@ function writeVertical_(ss, vertical, pulled, weekStart, todayDate, wtdDays, mtd
 }
 
 // ---------------------------------------------------------------------------------------------------
-// 13. Scheduling - "poll every 2 hours, last poll of the day at 11:30pm IST, no polling Sat/Sun or a
-//     listed holiday." Apps Script cannot natively express "every 2 hours, weekdays only, ending at a
-//     specific minute" as a single trigger object, so this installs ONE coarse trigger (every 30
-//     minutes, every day, all hours - the simplest, most robust trigger Apps Script supports) and relies
-//     on isScheduledSlot_() - checked as the FIRST statement of the trigger-fired function, before any
-//     HubSpot call - to decide whether this particular firing should do real work. Allowed slots: odd IST
-//     hours (1,3,5,...,23) at the half-hour (tolerance window minute 20-39, since Apps Script time
-//     triggers don't fire at an exact minute) - this lands on 01:30, 03:30, ..., 23:30 IST, 12 slots/day,
-//     exactly matching "every 2 hours, last poll at 11:30pm" with the last slot AT 23:30. Weekday/holiday
-//     gating is the HOLIDAYS_/WEEKDAY_OK_ maps above - add a date to HOLIDAYS_ to skip it, one line.
+// 13. Scheduling - CHANGED 2026-10-22 per explicit user ask: once daily at 6pm IST (was every 2 hours,
+//     12 slots/day - that design is preserved in git history / the comment below if ever needed again),
+//     no polling Sat/Sun or a listed holiday. Apps Script cannot natively express "once a day at a
+//     specific minute, weekdays only" as a single trigger object with the precision this needs, so this
+//     still installs ONE coarse trigger (every 30 minutes, every day, all hours - the simplest, most
+//     robust trigger Apps Script supports) and relies on isScheduledSlot_() - checked as the FIRST
+//     statement of the trigger-fired function, before any HubSpot call - to decide whether this
+//     particular firing should do real work. Allowed slot: IST hour 18 (6pm) at the half-hour (tolerance
+//     window minute 20-39, since Apps Script time triggers don't fire at an exact minute) - this lands on
+//     18:30 IST, once/day. Weekday/holiday gating is the HOLIDAYS_/WEEKDAY_OK_ maps above - add a date to
+//     HOLIDAYS_ to skip it, one line.
 //     CAVEAT (flagged, not hidden): this means the installed trigger technically fires every 30 minutes
 //     around the clock, every day including weekends - it is the GUARD, not the trigger's own schedule,
-//     that enforces the weekday/hour window. This is the realistic, achievable version of "don't poll
-//     outside the window" given Apps Script's trigger API (a trigger that itself only ever fires Mon-Fri
-//     at 12 specific times would need up to 60 separate weekday+hour triggers - exactly the "dozens of
-//     exact-time triggers" the brief said to avoid). The guard is written as the first, unconditional
-//     statement of dailySyncTick() so a bug anywhere else in the file cannot cause an off-schedule run to
-//     do real work.
+//     that enforces the weekday/hour window. The guard is written as the first, unconditional statement
+//     of dailySyncTick() so a bug anywhere else in the file cannot cause an off-schedule run to do real
+//     work.
 // ---------------------------------------------------------------------------------------------------
 function isScheduledSlot_(d) {
   if (!WEEKDAY_OK_[istPart_(d, 'EEE')]) return false;
   if (HOLIDAYS_[isoDateIst_(d)]) return false;
   var hour = Number(istPart_(d, 'H'));
-  if (hour % 2 === 0) return false;
+  if (hour !== 18) return false;
   var minute = Number(istPart_(d, 'm'));
   return minute >= 20 && minute <= 39;
 }
@@ -919,7 +1008,7 @@ function installTrigger() {
     if (fn === 'dailySyncTick' || fn === 'continueDailySync_') ScriptApp.deleteTrigger(triggers[i]);
   }
   ScriptApp.newTrigger('dailySyncTick').timeBased().everyMinutes(30).create();
-  Logger.log('installed: dailySyncTick every 30 min (odd IST hours, minute 20-39 = 01:30..23:30 IST, Mon-Fri, non-holiday only)');
+  Logger.log('installed: dailySyncTick every 30 min (guard allows only 18:30 IST, Mon-Fri, non-holiday - once/day)');
 }
 
 function pauseAutomation() {
@@ -933,7 +1022,7 @@ function pauseAutomation() {
   Logger.log('removed ' + removed + ' trigger(s) - automation paused');
 }
 
-// --- checkpointed run queue: processes cluster1/cluster2/coding in sequence, self-continuing via a
+// --- checkpointed run queue: processes cluster1/cluster2/coding/engineering in sequence, self-continuing via a
 //     one-off trigger if a single invocation risks running long (Apps Script's execution cap - see
 //     docs/DAILY_SYNC_APPS_SCRIPT_HANDOFF.md's warning on this). The continuation trigger deliberately
 //     does NOT re-check isScheduledSlot_() - it exists only to FINISH a run the schedule guard already
@@ -944,7 +1033,7 @@ function startQueuedRun_(nowDate) {
   var props = PropertiesService.getScriptProperties();
   if (props.getProperty('PENDING_VERTICALS')) { Logger.log('a run is already in progress - not starting another'); return; }
   var weekStart = mondayOfWeek_(nowDate), monthStart = firstOfMonthIst_(nowDate), today = todayMidnightIst_(nowDate);
-  var state = { remaining: ['cluster1', 'cluster2', 'coding'],
+  var state = { remaining: ['cluster1', 'cluster2', 'coding', 'engineering'],
                 weekStartIso: isoDateIst_(weekStart), monthStartIso: isoDateIst_(monthStart), todayIso: isoDateIst_(today) };
   props.setProperty('PENDING_VERTICALS', JSON.stringify(state));
   processQueue_();
@@ -1071,8 +1160,10 @@ function runDailySyncNow_() {
 //     pullVertical_'s already-computed per-owner day buckets (summed across reps for the team-level D-1
 //     row, same way teamWtd/teamMtd/teamItd are already team-level sums).
 //     TEST-ONLY RECIPIENT until the user explicitly says to widen it - see EMAIL_RECIPIENTS_ below.
-//     SCOPE: coding/cluster1/cluster2 only, same 3 verticals this whole file covers - Engineering
-//     Datasets (RAT) is not pulled by this script and so cannot appear in this email either.
+//     SCOPE: coding/cluster1/cluster2 only - UNCHANGED 2026-10-22 when engineering was added to the sheet
+//     -write queue (see SCOPE in the file header): the user's ask that day was specifically the 6pm sheet
+//     sync, not this email. Engineering Datasets IS now pulled by this script (pullVertical_), so adding
+//     it here is a small, deliberate follow-up if/when asked - not a limitation left over from before.
 // ---------------------------------------------------------------------------------------------------
 var EMAIL_RECIPIENTS_ = ['bhanu.enamala@lh2.ai']; // TEST PHASE ONLY - do not widen without explicit sign-off
 var EMAIL_METRIC_LABELS_ = {
@@ -1194,4 +1285,22 @@ function testSendDailyEmailNow() {
   // appear there either. This wrapper is the one to select and Run from the editor for the first-time
   // OAuth consent click; testSendDailyEmailNow_() itself is still what clasp run/future code should call.
   return testSendDailyEmailNow_();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// 16. Verification wrappers for the 2026-10-22 'engineering' (RAT) extension - plain names so they show
+//     up in the Run dropdown (see testSendDailyEmailNow's comment above for why). Follow the file header
+//     SETUP steps: dry-run first (compare its Logger output against a fresh
+//     `python3 tools/daily_sync_pull.py` run's Engineering Datasets numbers), only then a single live
+//     write, before trusting the 6pm trigger to include it.
+// ---------------------------------------------------------------------------------------------------
+function testEngineeringDryRun() {
+  return testDryRun_('engineering');
+}
+
+function runEngineeringLiveOnce() {
+  // Real write for ONLY the Engineering Datasets tab - run this after testEngineeringDryRun looks right,
+  // to verify the actual sheet write before relying on the 6pm trigger (which now includes 'engineering'
+  // in its queue automatically - no separate step needed to "turn it on" once this checks out).
+  return runOneVerticalLive_('engineering');
 }

@@ -1,12 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Runs tools/daily_sync_pull.py every morning at 8:00am (local laptop time) and writes both the
-  Daily Sync tab (Supply Team Mapping sheet) and the Performance Report sheet's 5 per-team tabs.
+  CHANGED 2026-10-12 per explicit user ask: moved from 8:00am to 1:00am (everyone has stopped working
+  by then, so the full previous day is settled) - the report is sitting ready and refreshed well before
+  anyone checks it at 8am, instead of running AT 8am (race with whoever opens the sheet first).
 
-  Requires this laptop to be ON and AWAKE at 8am - launchd does NOT wake a sleeping Mac on its own
+  Runs tools/daily_sync_pull.py every night at 1:00am (local laptop time) and writes both the Daily
+  Sync tab (Supply Team Mapping sheet) and the Performance Report sheet's 5 per-team tabs.
+
+  Data sourcing (as of 2026-10-12): this script still does its own live HubSpot API pull for every
+  number (stage-history batch-reads, Task associations for follow-up coverage, same-day-lead-coverage
+  history walk) - it does NOT yet read from the MAIN/CompanyOps webhook's RawWebhookLog. The webhook
+  captures real-time dealstage-change events in parallel (confirmed live, separate pipeline) but isn't
+  wired into this script's numbers yet, because it only has history from whenever each portal's webhook
+  went live forward - not enough backfill yet to safely replace the live API pull without silently
+  under-counting earlier-in-the-week activity. Planned upgrade, not done: once the webhook has a full
+  week+ of accumulated history, switch stage-count aggregation to read StageEvents (the parsed webhook
+  log) first and only fall back to a live API pull for anything predating the webhook's go-live, which
+  would make this run far cheaper/faster. Tasks (follow-up coverage) will ALWAYS need the API key
+  regardless of that upgrade - HubSpot has no Task-webhook subscription set up (or even available
+  through this app's scope picker), so that part stays API-based permanently, by design, not as a gap.
+
+  Requires this laptop to be ON and AWAKE at 1am - launchd does NOT wake a sleeping Mac on its own
   (pmset -g sched can schedule a wake, see the install instructions). If the laptop is off/asleep at
-  8am, launchd runs it as soon as the machine wakes (StartCalendarInterval fires the next time the
+  1am, launchd runs it as soon as the machine wakes (StartCalendarInterval fires the next time the
   condition is met, it does not queue up missed runs retroactively beyond that).
 
   Install:
@@ -21,7 +38,7 @@
   the sheets don't update - a stale HubSpot token or a changed stage id would show up here, not in
   any Google Sheet).
 
-  Test without waiting for 8am:
+  Test without waiting for 1am:
     launchctl start com.lh2.dailysync
 -->
 <plist version="1.0">
@@ -43,7 +60,7 @@
   <key>StartCalendarInterval</key>
   <dict>
     <key>Hour</key>
-    <integer>8</integer>
+    <integer>1</integer>
     <key>Minute</key>
     <integer>0</integer>
   </dict>
